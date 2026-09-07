@@ -23,3 +23,26 @@ export const createReport = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+
+export const getMyReports = async (req, res) => {
+    try {
+        const reports =  await Report.find({ user: req.user.id }).sort({ createdAt: -1 });
+        res.status(200).json({ reports });
+    
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    } 
+};
+
+
+
+export const getAllReports = async (req, res) => {
+    try {
+        const reports = await Report.find().populate('user', 'name email').sort({ createdAt: -1 });
+        res.status(200).json({ reports });
+
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
