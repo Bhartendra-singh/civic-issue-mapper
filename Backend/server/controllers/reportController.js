@@ -92,3 +92,27 @@ export const deleteReport = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+
+export const getAnalytics = async (req, res) => {
+    try {
+        const totalReports = await Report.countDocuments();
+
+        const statusCounts = await Report.aggregate([
+            { $group: { _id: '$status', count: { $sum: 1} } },
+        ]);
+
+        const categoryCounts = await Report.aggregate([
+            { $group: { _id: '$category', count: { $sum: 1} } },
+        ]);
+
+        res.status(200).json({
+            totalReports,
+            statusCounts,
+            categoryCounts,
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
