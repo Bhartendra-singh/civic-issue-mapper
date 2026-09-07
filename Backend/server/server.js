@@ -4,6 +4,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/authRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
+
 
 
 dotenv.config();    //call this function and it will findout .env file and read it 
@@ -24,7 +26,7 @@ mongoose.connect(process.env.MONGODB_URI)
 
 
 app.use('/api/auth', authRoutes);
-
+app.use('/api/reports', reportRoutes);
 
 
 app.get('/', (req, res) => {
