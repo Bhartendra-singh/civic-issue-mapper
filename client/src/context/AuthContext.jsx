@@ -1,17 +1,23 @@
 import { createContext, useContext, useState } from 'react';
-
+import { logoutUser } from '../services/api';
 
 const AuthContext = createContext();
 
-export function AuthProvider( { children }) {
-    const [user, setuser] = useState(null);
+export function AuthProvider({ children }) {
+    const [user, setUser] = useState(null);
 
     const login = (userData) => {
-        setuser(userData);
+        setUser(userData);
     };
 
-    const logout = () => {
-        setuser(null);
+    const logout = async () => {
+        try {
+            await logoutUser();
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+
+        setUser(null);
     };
 
 

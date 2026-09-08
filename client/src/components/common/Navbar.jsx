@@ -1,9 +1,15 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 
 function Navbar() {
     const { user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+        await logout();
+        navigate('/');
+    };
 
     
   return (
@@ -23,7 +29,7 @@ function Navbar() {
           <>
             <span className="font-body text-ink">Hi, {user.name}</span>
             <button
-              onClick={logout}
+              onClick={handleLogout}
               className="font-body text-ink hover:text-rust transition-colors"
             >
               Logout
@@ -31,10 +37,16 @@ function Navbar() {
           </>
         ) : (
 
-          <Link to="/login" className="font-body text-ink hover:text-rust transition-colors">
-            Login
-          </Link>
-          
+            <>
+                <Link to="/signup" className="font-body text-ink hover:text-rust transition-colors">
+                Sign Up
+                </Link>
+
+                <Link to="/login" className="font-body text-ink hover:text-rust transition-colors">
+                Login
+                </Link>
+            </>
+
         )}
       </div>
     </nav>
