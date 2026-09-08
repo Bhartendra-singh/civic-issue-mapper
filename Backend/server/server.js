@@ -14,7 +14,12 @@ const app = express();  //call the express function and it return a object that 
 
 
 //Middlewares 
-app.use(cors());        // this function use to attach middleware(each request jo server tk aaye wo phle ye function chalao)
+//app.use(cors());        // this function use to attach middleware(each request jo server tk aaye wo phle ye function chalao)
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true,
+}));
+
 app.use(express.json());
 app.use(cookieParser());
 
