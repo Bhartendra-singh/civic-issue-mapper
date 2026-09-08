@@ -3,14 +3,18 @@ import Report from '../models/Report.js';
 
 export const createReport = async (req, res) => {
     try {
-        const { category, description, photoUrl, lat, lng, } = req.body;
+        const { category, description, lat, lng, } = req.body;
 
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'Photo is required' });
+        }
 
         const newReport = await Report.create({
             user: req.user.id,
             category,
             description,
-            photoUrl,
+            photoUrl: req.file.path,
             location: { lat, lng },
         });
 
