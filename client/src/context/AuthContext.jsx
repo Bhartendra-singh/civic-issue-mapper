@@ -1,10 +1,26 @@
-import { createContext, useContext, useState } from 'react';
-import { logoutUser } from '../services/api';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { logoutUser, getProfile } from '../services/api';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const data = await getProfile();
+                setUser(data.user);
+            } catch (error) {
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        checkAuth();
+    }, []);
 
     const login = (userData) => {
         setUser(userData);
@@ -22,7 +38,7 @@ export function AuthProvider({ children }) {
 
 
     return (
-        <AuthContext.Provider value={{ user, login, logout }}>
+        <AuthContext.Provider value={{ user, login, logout, loading }}>
             {children}
         </AuthContext.Provider>
     ); 

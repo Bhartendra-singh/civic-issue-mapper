@@ -53,3 +53,50 @@ export const signupUser = async (name, email, password) => {
 
     return data;
 };
+
+
+export const createReport = async (formDataObj) => {
+    const response = await fetch(`${API_URL}/reports`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formDataObj,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.message || 'Failed to submit report');
+    }
+
+    return data;
+};
+
+
+export const getProfile = async () => {
+    const response = await fetch(`${API_URL}/auth/profile`, {
+        credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok){
+        throw new Error(data.message || 'Not authenticated');
+    }
+
+    return data;
+};
+
+
+export const getMyReports = async () => {
+    const response = await fetch(`${API_URL}/reports/my-reports`, {
+        credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch reports');
+    }
+
+    return data;
+};
