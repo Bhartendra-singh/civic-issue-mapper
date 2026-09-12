@@ -120,3 +120,13 @@ export const getAnalytics = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+
+export const getAllPublicReports = async (req, res) => {
+    try {
+        const reports = await Report.find().select('category location status createdAt');
+        res.status(200).json({ reports });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};

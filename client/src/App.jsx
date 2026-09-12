@@ -7,6 +7,9 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import MyReports from './pages/MyReports';
+import MapExplorer from './pages/MapExplorer';
+import AdminRoute from './components/common/AdminRoute';
+import AdminDashboard from './pages/admin/AdminDashboard';
 
 
 function App() {
@@ -32,6 +35,17 @@ function App() {
               <ProtectedRoute>
                 <MyReports />
               </ProtectedRoute>
+            }
+          />
+
+          <Route path="/map" element={<MapExplorer />} />
+
+          <Route
+            path="/admin/dashboard"
+            element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
             }
           />
         </Routes>

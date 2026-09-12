@@ -100,3 +100,47 @@ export const getMyReports = async () => {
 
     return data;
 };
+
+
+export const getAllPublicReports = async () => {
+    const response = await fetch(`${API_URL}/reports/public`);
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch reports');
+    }
+
+    return data;
+};
+
+
+export const getAllReports = async () => {
+    const response = await fetch(`${API_URL}/reports/all`, {
+        credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch reports');
+    }
+
+    return data;
+};
+
+export const updateReportStatus = async (reportId, status) => {
+    const response = await fetch(`${API_URL}/reports/${reportId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.message || 'Failed to update status');
+    }
+
+    return data;
+};
