@@ -144,3 +144,43 @@ export const updateReportStatus = async (reportId, status) => {
 
     return data;
 };
+
+
+export const verifyEmail = async (token) => {
+    const response = await fetch(`${API_URL}/auth/verify-email/${token}`);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.message || 'Verification failed');
+    }
+
+    return data;
+}
+
+
+export const forgotPassword = async (email) => {
+    const response = await fetch(`${API_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+    });
+    const data = await response.json();
+    
+    if (!response.ok) {
+        throw new Error(data.message || 'Request failed');
+    }
+
+    return data;
+};
+
+export const resetPassword = async (token, newPassword) => {
+  const response = await fetch(`${API_URL}/auth/reset-password/${token}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newPassword }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Reset failed');
+  return data;
+};

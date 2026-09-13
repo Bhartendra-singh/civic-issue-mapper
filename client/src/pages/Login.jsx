@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { loginUser } from '../services/api';
 import { useAuth } from "../context/AuthContext";
+
 
 
 function Login() {
@@ -89,6 +90,9 @@ function Login() {
             className="w-full border border-hairline rounded px-3 py-2 font-body focus:outline-none focus:border-rust"
             required
           />
+          <Link to="/forgot-password" className="text-rust text-sm font-body underline">
+            Forgot Password?
+          </Link>
         </div>
 
         <button

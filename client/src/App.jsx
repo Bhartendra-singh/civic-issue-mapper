@@ -10,6 +10,10 @@ import MyReports from './pages/MyReports';
 import MapExplorer from './pages/MapExplorer';
 import AdminRoute from './components/common/AdminRoute';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import VerifyEmail from './pages/VerifyEmail';
+import VerificationBanner from './components/common/VerificationBanner';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 
 function App() {
@@ -17,6 +21,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Navbar />
+        <VerificationBanner />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
@@ -48,6 +53,10 @@ function App() {
               </AdminRoute>
             }
           />
+
+          <Route path="/verify-email/:token" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

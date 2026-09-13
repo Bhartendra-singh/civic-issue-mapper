@@ -27,6 +27,11 @@ function Navbar() {
 
         {user ? (
           <>
+            {user.role === 'admin' && (
+              <Link to="/admin/dashboard" className="font-body text-ink hover:text-rust transition-colors">
+                Dashboard
+              </Link>
+            )}
             <span className="font-body text-ink">Hi, {user.name}</span>
             <button
               onClick={handleLogout}

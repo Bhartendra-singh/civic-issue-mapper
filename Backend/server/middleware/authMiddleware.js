@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
 
 
-export const protect = (req, res, next) => {
+export const protect = async (req, res, next) => {
     const token = req.cookies.token;
 
     if (!token) {
@@ -10,7 +11,15 @@ export const protect = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
+        const user = await User.findById(decoded.id).select('-password');
+
+        if (!user) {
+            return res.status(401).json({ message: 'User not found' });
+        }
+
+
+        // req.user = decoded;
+        req.user = user;
         next();
 
     } catch (error) {
@@ -25,5 +34,12 @@ export const isAdmin = (req, res, next) => {
         return res.status(403).json({ message: 'Access denied, admin only' });
     }
 
+    next();
+};
+
+export const requireVerified = (req, res, next) => {
+    if (!req.user.isVerified) {
+        return res.status(403).json( { message: 'Please verify your email before submitting a report' });
+    }
     next();
 };

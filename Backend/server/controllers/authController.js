@@ -1,6 +1,8 @@
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../config/sendEmail.js';
 
 
 export const signup = async (req, res) => {
@@ -16,12 +18,18 @@ export const signup = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+
 
         const newUser = await User.create({
             name,
             email,
             password: hashedPassword,
+            verificationToken,
         });
+
+        const verificationLink = `http://localhost:5173/verify-email/${verificationToken}`;
+        await sendVerificationEmail(newUser.email, verificationLink);
 
         const token = jwt.sign(
             { id: newUser._id, role: newUser.role },
@@ -36,8 +44,8 @@ export const signup = async (req, res) => {
         });
 
         res.status(201).json({
-            message: 'User created successfully',
-            user: { id: newUser._id, name: newUser.name, email: newUser.email, role: newUser.role },
+            message: 'User created. Please check your email to verify your account.',
+            user: { id: newUser._id, name: newUser.name, email: newUser.email, role: newUser.role, isVerified: newUser.isVerified },
         });
 
     } catch (error) {
@@ -98,4 +106,74 @@ export const getProfile = async (req, res) => {
 export const logout = (req, res) => {
     res.clearCookie('token');
     res.status(200).json({ message: 'Logged out successfully' });
+};
+
+
+export const verifyEmail = async (req, res) => {
+    try {
+        const { token } = req.params;
+
+        const user = await User.findOne({ verificationToken: token });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid or expired verification link' });
+        }
+
+        user.isVerified = true;
+        user.verificationToken = undefined;
+        await user.save();
+
+        res.status(200).json({ message: 'Email verification successfully' });
+    
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+
+    }
+};
+
+
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' });
+        }
+
+        const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+
+        const resetLink = `http://localhost:5173/reset-password/${resetToken}`;
+        await sendPasswordResetEmail(user.email, resetLink);
+
+        res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' });
+
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+
+export const resetPassword = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { newPassword } = req.body;
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        const user = await User.findById(decoded.id);
+        
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid or expired reset link' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+
+        res.status(200).json({ message: 'Password reset successful. Please log in with your new  password.' });
+    } catch (error) {
+        res.status(400).json({ message: 'Invalid or expired reset link' });
+    }
 };
