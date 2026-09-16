@@ -46,6 +46,17 @@ const reportSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+
+        department: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Department',
+            default: null,
+        },
+
+        upvoteCount: {
+            type: Number,
+            default: 0,
+        },
     },
 
     { timestamps: true }

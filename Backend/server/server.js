@@ -5,7 +5,12 @@ import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/authRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
-
+import notificationRoutes from './routes/notificationRoutes.js';
+import upvoteRoutes from './routes/upvoteRoutes.js';
+import commentRoutes from './routes/commentRoutes.js';
+import departmentRoutes from './routes/departmentRoutes.js';
+import auditLogRoutes from './routes/auditLogRoutes.js';
+import feedbackRoutes from './routes/feedbackRoutes.js';
 
 
 dotenv.config();    //call this function and it will findout .env file and read it 
@@ -15,7 +20,7 @@ const app = express();  //call the express function and it return a object that 
 
 //Middlewares 
 //app.use(cors());        // this function use to attach middleware(each request jo server tk aaye wo phle ye function chalao)
-app.use(cors({
+app.use(cors({ 
   origin: 'http://localhost:5173',
   credentials: true,
 }));
@@ -32,6 +37,12 @@ mongoose.connect(process.env.MONGODB_URI)
 
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/notificatons', notificationRoutes);
+app.use('/api/upvotes', upvoteRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/departments', departmentRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 
 app.get('/', (req, res) => {
