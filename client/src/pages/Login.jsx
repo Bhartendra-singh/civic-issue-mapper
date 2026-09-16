@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { loginUser } from '../services/api';
 import { useAuth } from "../context/AuthContext";
 
@@ -16,6 +16,7 @@ function Login() {
 
     const { login } = useAuth();
     const navigate = useNavigate();
+    const routerLocation = useLocation(); //new change
 
 
     const handleChange = (e) => {
@@ -36,7 +37,17 @@ function Login() {
         const data = await loginUser(formData.email, formData.password);
         // console.log('Login successful:', data);
         login(data.user);
-        navigate('/');
+
+        //new change
+        
+        const from = routerLocation.state?.from;
+        if (from) {
+          navigate(from.pathname, { state: from.state });
+        
+        } else {
+          navigate('/');
+        }
+
     
         } catch (err) {
             setError(err.message);

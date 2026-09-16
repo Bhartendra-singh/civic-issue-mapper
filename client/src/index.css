@@ -10,6 +10,28 @@
   --color-amber: #D9A441;
   --color-hairline: #D8D3C7;
 
+
+    /* ── New palette — Charcoal-navy + Cyan (Home + Navbar use this) ── */
+  --color-navy: #0b1626;
+  --color-navy-2: #0e1c30;
+  --color-panel: #122a3d;
+  --color-panel-light: #17334a;
+  --color-cyan: #22d3ee;
+  --color-cyan-dim: #22d3ee33;
+  --color-light: #eef1f4;
+  --color-ink: #2C3E5C;
+  --color-text-primary: #f1f5f9;
+  --color-text-muted: #94a3b8;
+
+  --color-status-open: #fb7185;
+  --color-status-open-bg: #fecdd3;
+  --color-status-progress: #f59e0b;
+  --color-status-progress-bg: #fde68a;
+  --color-status-resolved: #10b981;
+  --color-status-resolved-bg: #a7f3d0;
+  --color-pin: #fb7185;
+  --color-bolt: #fb923c;
+
   --font-heading: "Space Grotesk", sans-serif;
   --font-body: "IBM Plex Sans", sans-serif;
 }
