@@ -84,7 +84,7 @@ export const login = async (req, res) => {
 
         res.status(200).json({
             message: 'Login successful',
-            user: { id: existingUser._id, name: existingUser.name, email: existingUser.email, role: existingUser.role },
+            user: { id: existingUser._id, name: existingUser.name, email: existingUser.email, role: existingUser.role, isVerified: existingUser.isVerified },
         });
 
     } catch (error) {
@@ -163,7 +163,7 @@ export const resetPassword = async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         const user = await User.findById(decoded.id);
-        
+
         if (!user) {
             return res.status(400).json({ message: 'Invalid or expired reset link' });
         }
