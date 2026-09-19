@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import { createStatusChangeNotification } from './notificationController.js';
 import { getDepartmentByCategory } from './departmentController.js';
 import { createAuditLog } from './auditLogController.js';
+import cloudinary from '../config/cloudinary.js';
 
 
 export const createReport = async (req, res) => {
@@ -10,9 +11,14 @@ export const createReport = async (req, res) => {
         const { category, description, lat, lng, } = req.body;
 
 
-        if (!req.file) {
-            return res.status(400).json({ message: 'Photo is required' });
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ message: ' At least one Photo is required' });
         }
+
+        const photoUrls = req.files.map((file) => ({
+            url: file.path,
+            publicId: file.filename,
+        }));
 
         const department = await getDepartmentByCategory(category);
 
@@ -20,7 +26,7 @@ export const createReport = async (req, res) => {
             user: req.user.id,
             category,
             description,
-            photoUrl: req.file.path,
+            photoUrls,
             location: { lat, lng },
             department: department ? department._id : null,
         });
@@ -31,6 +37,7 @@ export const createReport = async (req, res) => {
         });
 
     } catch (error) {
+        console.log(error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
@@ -70,6 +77,11 @@ export const updateReportStatus = async (req, res) => {
         }
 
         report.status = status;
+
+        if (status === 'resolved') {
+            report.resolvedAt = new Date();
+        }
+
         await report.save();
 
         await createStatusChangeNotification(report.user, report._id, report.category, report.status);
@@ -77,7 +89,8 @@ export const updateReportStatus = async (req, res) => {
         await createAuditLog(
             req.user.id,
             'status-update',
-            'Report._id',
+            'Report',
+            report.id,
             `Changed status of ${report.category} report to ${report.status}`
         );
 
@@ -176,6 +189,199 @@ export const getPublicStats = async (req, res) => {
         });
     
     } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+
+export const editReport = async (req, res) => {
+    try {
+        const { description, removePhotoIds } = req.body;
+
+        const report = await Report.findById(req.params.id);
+
+        if (!report) {
+            return res.status(400).json({ message: 'Report not found' });
+        }
+
+        const isOwner = report.user.toString() === req.user.id;
+
+        if (!isOwner) {
+            return res.status(403).json({ message: 'You can only edit your own reports' });
+        }
+
+        if (report.status !== 'pending') {
+            return res.status(400).json({ message: 'Report can only be edited while it is pending' });
+        }
+
+        if (description) {
+            report.description = description;
+        }
+
+        const idsToRemove = removePhotoIds ? removePhotoIds.split(',') : [] ;
+
+        if (idsToRemove.length > 0) {
+            for (const publicId of idsToRemove) {
+                await cloudinary.uploader.destroy(publicId);
+            }
+
+            report.photoUrls = report.photoUrls.filter(
+                (photo) => !idsToRemove.includes(photo.publicId)
+            );
+        }
+
+        if(req.files && req.files.length > 0) {
+            const newPhotos = req.files.map((file) => ({
+                url: file.path,
+                publicId: file.filename,
+            }));
+
+            report.photoUrls = [...report.photoUrls, ...newPhotos];
+        }
+
+        if (report.photoUrls.length > 4) {
+            return res.status(400).json({ message: 'A report can have a maximum of 4 photos' });
+        }
+
+        if (report.photoUrls.length === 0) {
+            return res.status(400).json({ message: 'A report must have at least 1 photo' });
+        }
+
+        await report.save();
+
+        res.status(200).json({ message: 'Report updated successfully', report });
+    
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+
+};
+
+
+export const reopenReport = async (req, res) => {
+    try {
+        const report = await Report.findById(req.params.id);
+
+        if (!report) {
+            return res.status(404).json({ message: 'Report not found' });
+        }
+
+        const isOwner = report.user.toString() === req.user.id;
+
+        if (!isOwner) {
+            return res.status(403).json({ message: 'Only the report owner can reopen this report' });
+        }
+
+        if (report.status !== 'resolved') {
+            return res.status(400).json({ message: 'Only resolved reports can be reopened' });
+        }
+
+        if (report.hasBeenReopened) {
+            return res.status(400).json({ message: 'This report has already been reopened once' });
+        }
+
+        const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
+        const timeSinceResolved = Date.now() - report.resolvedAt.getTime();
+
+        if (timeSinceResolved > sevenDaysInMs) {
+            return res.status(400).json({ message: 'Reopen window has expired (7 days after resolution)' });
+        }
+
+        report.status = 'reopened';
+        report.hasBeenReopened = true;
+        report.resolvedAt = null;
+
+        await report.save();
+
+        await createAuditLog(
+            req.user.id,
+            'status-update',
+            'Report',
+            report._id,
+            `Report reopened by citizen: ${report.category}`
+        );
+
+        res.status(200).json({ message: 'Report reopened successfully', report });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+
+export const getAccountabilityMetrics = async (req, res) => {
+    try {
+        const totalEverResolved = await Report.countDocuments({
+            status: { $in: ['resolved', 'reopened'] }
+        });
+
+        const reopenedCount = await Report.countDocuments({ hasBeenReopened: true });
+
+        const reopenRate = totalEverResolved > 0
+            ? Number(((reopenedCount / totalEverResolved) * 100).toFixed(2))
+            : 0;
+
+        const activeReports = await Report.find({
+            status: { $in: ['pending', 'in-progress'] }
+        }).populate('department', 'slaHours');
+
+        let breachedCount = 0;
+
+        for (const report of activeReports) {
+            if (!report.department) continue;
+
+            const slaMs = report.department.slaHours * 60 * 60 * 1000;
+            const ageMs = Date.now() - report.createdAt.getTime();
+
+            if (ageMs > slaMs) {
+                breachedCount++;
+            }
+        }
+
+        const breachRate = activeReports.length > 0
+            ? Number(((breachedCount / activeReports.length) * 100).toFixed(2))
+            : 0;
+
+        const resolvedReports = await Report.find({
+            resolvedAt: { $ne: null }
+        }).select('createdAt resolvedAt');
+
+        const resolutionTimesInDays = resolvedReports.map((report) => {
+            const diffMs = report.resolvedAt.getTime() - report.createdAt.getTime();
+            return diffMs / (1000 * 60 * 60 * 24);
+        });
+
+        resolutionTimesInDays.sort((a, b) => a - b);
+
+        let medianResolutionDays = 0;
+
+        if (resolutionTimesInDays.length > 0) {
+            const mid = Math.floor(resolutionTimesInDays.length / 2);
+
+            if (resolutionTimesInDays.length % 2 === 0) {
+                medianResolutionDays = (resolutionTimesInDays[mid - 1] + resolutionTimesInDays[mid]) / 2;
+            } else {
+                medianResolutionDays = resolutionTimesInDays[mid];
+            }
+
+            medianResolutionDays = Number(medianResolutionDays.toFixed(1));
+        }
+
+        res.status(200).json({
+            reopenRate,
+            slaBreachRate: breachRate,
+            medianResolutionDays,
+            sampleSize: {
+                totalEverResolved,
+                activeReports: activeReports.length,
+                resolvedWithTimestamp: resolvedReports.length,
+            },
+        });
+
+    } catch (error) {
+        console.log(error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };

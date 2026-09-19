@@ -19,10 +19,28 @@ const reportSchema = new mongoose.Schema(
             required: true,
         },
 
-        photoUrl: {
-            type: String,
-            required: true,
+        photoUrls: {
+            type: [
+                {
+                    url: {
+                        type: String,
+                        required: true,
+                    },
+                    publicId: {
+                        type: String,
+                        required: true,
+                    },
+                },
+            ],
+
+            validate: {
+                validator: function (photos) {
+                    return photos.length >= 1 && photos.length <= 4;
+                },
+                message: 'A report must have between 1 and 4 photos',
+            },
         },
+
 
         location: {
             lat: {
@@ -38,7 +56,7 @@ const reportSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: ['pending', 'in-progress', 'resolved'],
+            enum: ['pending', 'in-progress', 'resolved', 'reopened'],
             default: 'pending',
         },
 
@@ -56,6 +74,16 @@ const reportSchema = new mongoose.Schema(
         upvoteCount: {
             type: Number,
             default: 0,
+        },
+
+        resolvedAt: {
+            type: Date,
+            default: null,
+        },
+
+        hasBeenReopened: {
+            type: Boolean,
+            default: false,
         },
     },
 

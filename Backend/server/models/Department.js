@@ -19,6 +19,12 @@ const departmentSchema = new mongoose.Schema(
             type: [String],
             default: [],
         },
+
+        slaHours: {
+            type: Number,
+            required: true,
+            default: 72,
+        },
     },
 
     { timestamps: true }
