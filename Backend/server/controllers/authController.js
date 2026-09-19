@@ -3,6 +3,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../config/sendEmail.js';
+import cloudinary from '../config/cloudinary.js';
+import RefreshToken from '../models/RefreshToken.js';
+import { generateTokens } from '../utils/generateTokens.js';
 
 
 export const signup = async (req, res) => {
@@ -31,17 +34,19 @@ export const signup = async (req, res) => {
         const verificationLink = `http://localhost:5173/verify-email/${verificationToken}`;
         await sendVerificationEmail(newUser.email, verificationLink);
 
-        const token = jwt.sign(
-            { id: newUser._id, role: newUser.role },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
 
+        const { accessToken, refreshToken } = await generateTokens(newUser._id, newUser.role);
 
-        res.cookie('token', token, {
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            maxAge: 15 * 60 * 1000,
+        });
+
+        res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
+
 
         res.status(201).json({
             message: 'User created. Please check your email to verify your account.',
@@ -71,16 +76,29 @@ export const login = async (req, res) => {
             return res.status(400).json({ message: 'Invalid email or password' });
         }
 
-        const token = jwt.sign(
-            { id: existingUser._id, role: existingUser.role },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
+        // const token = jwt.sign(
+        //     { id: existingUser._id, role: existingUser.role },
+        //     process.env.JWT_SECRET,
+        //     { expiresIn: '7d' }
+        // );
 
-        res.cookie('token', token, {
+        // res.cookie('token', token, {
+        //     httpOnly: true,
+        //     maxAge: 7 * 24 * 60 * 60 * 1000,
+        // });
+
+        const { accessToken, refreshToken } = await generateTokens(existingUser._id, existingUser.role);
+
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            maxAge: 15 * 60 * 1000,
+        });
+
+        res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
+        
 
         res.status(200).json({
             message: 'Login successful',
@@ -103,9 +121,28 @@ export const getProfile = async (req, res) => {
 };
 
 
-export const logout = (req, res) => {
-    res.clearCookie('token');
-    res.status(200).json({ message: 'Logged out successfully' });
+// export const logout = (req, res) => {
+//     res.clearCookie('token');
+//     res.status(200).json({ message: 'Logged out successfully' });
+// };
+
+export const logout = async (req, res) => {
+    try {
+        const refreshToken = req.cookies.refreshToken;
+
+        if (refreshToken) {
+            await RefreshToken.deleteOne({ token: refreshToken });
+        }
+
+        res.clearCookie('accessToken');
+        res.clearCookie('refreshToken');
+
+        res.status(200).json({ message: 'Logged out successfully' });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
 };
 
 
@@ -175,5 +212,123 @@ export const resetPassword = async (req, res) => {
         res.status(200).json({ message: 'Password reset successful. Please log in with your new  password.' });
     } catch (error) {
         res.status(400).json({ message: 'Invalid or expired reset link' });
+    }
+};
+
+
+export const updateProfile = async (req, res) => {
+    try {
+        const { name } = req.body;
+
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (name) {
+            user.name = name;
+        }
+
+        if (req.file) {
+            if (user.profilePhotoId) {
+                await cloudinary.uploader.destroy(user.profilePhotoId);
+            }
+
+            user.profilePhoto = req.file.path;
+            user.profilePhotoId = req.file.filename;
+        }
+
+        await user.save();
+
+        res.status(200).json({
+            message: 'Profile updated successfully' ,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                isVerified: user.isVerified,
+                profilePhoto: user.profilePhoto,
+            },
+        });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+
+export const googleCallback = async (req, res) => {
+    try {
+        const user = req.user;
+
+        const { accessToken, refreshToken } = await generateTokens(user._id, user.role);
+
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            maxAge: 15 * 60 * 1000,
+        });
+
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+
+
+        res.redirect('http://localhost:5173');
+
+    } catch (error) {
+        console.log(error);
+        res.redirect('http://localhost:5173/login?error=google-auth-failed');
+    }
+};
+
+
+export const refreshAccessToken = async (req, res) => {
+    try {
+        const oldRefreshToken = req.cookies.refreshToken;
+
+        if (!oldRefreshToken) {
+            return res.status(401).json({ message: 'No refresh token provided' });
+        }
+
+        const storedToken = await RefreshToken.findOne({ token: oldRefreshToken });
+
+        if (!storedToken) {
+            return res.status(401).json({ message: 'Invalid refresh token' });
+        }
+
+        if (storedToken.expiresAt < new Date()) {
+            await storedToken.deleteOne();
+            return res.status(401).json({ message: 'Refresh token expired, please log in again' });
+        }
+
+        const user = await User.findById(storedToken.user);
+
+        if (!user) {
+            return res.status(401).json({ message: 'User not found' });
+        }
+
+        await storedToken.deleteOne();
+
+        const { accessToken, refreshToken } = await generateTokens(user._id, user.role);
+
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            maxAge: 15 * 60 * 1000,
+        });
+
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+
+        res.status(200).json({ message: 'Token refreshed successfully' });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 };

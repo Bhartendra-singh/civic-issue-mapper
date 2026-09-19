@@ -1,3 +1,4 @@
+import passport from './config/passport.js';
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -27,6 +28,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(passport.initialize());
 
 
 mongoose.connect(process.env.MONGODB_URI)

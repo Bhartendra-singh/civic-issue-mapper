@@ -16,7 +16,9 @@ const userSchema = new mongoose.Schema(
 
         password: {
             type: String,
-            required: true,
+            required: function () {
+                return this.authProvider === 'local';
+            },
         },
 
         role: {
@@ -32,6 +34,22 @@ const userSchema = new mongoose.Schema(
 
         verificationToken: {
             type: String,
+        },
+
+        profilePhoto: {
+            type: String,
+            default: '',
+        },
+
+        profilePhotoId: {
+            type: String,
+            default: '',
+        },
+
+        authProvider: {
+            type: String,
+            enum: ['local', 'google'],
+            default: 'local',
         },
     },
 
