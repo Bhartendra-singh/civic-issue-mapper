@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MapPin, Leaf, ShieldCheck, Zap, Tag, FileText, Camera, Send } from 'lucide-react';
+import { MapPin, Leaf, ShieldCheck, Zap, Tag, FileText, Camera, Send, Navigation } from 'lucide-react';
 import { createReport } from '../services/api';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
 
 
 function SubmitReport() {
@@ -221,8 +223,8 @@ function SubmitReport() {
                                 <MapPin size={20} className="text-cyan" />
                             </div>
                             <div>
-                                <span className="inline-block bg-cyan-dim text-cyan text-xs font-semibold px-3 py-1 rounded-full">
-                                    📍 New Report
+                                <span className="inline-flex items-center gap-1.5 bg-cyan-dim text-cyan text-xs font-semibold px-3 py-1 rounded-full">
+                                    <Zap size={12} /> New Report
                                 </span>
                             </div>
                         </div>
@@ -249,26 +251,26 @@ function SubmitReport() {
                                 onChange={(e) => setCategory(e.target.value)}
                                 className="w-full border border-hairline rounded-lg px-4 py-3 font-body text-ink outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/20 transition-all"
                             >
-                                <option value="pothole">🕳️ Pothole</option>
-                                <option value="garbage">🗑️ Garbage</option>
-                                <option value="waterlogging">💧 Waterlogging</option>
-                                <option value="streetlight">💡 Streetlight</option>
-                                <option value="drain">🚰 Drain</option>
-                                <option value="other">⚠️ Other</option>
+                                <option value="pothole">Pothole</option>
+                                <option value="garbage">Garbage</option>
+                                <option value="waterlogging">Waterlogging</option>
+                                <option value="streetlight">Streetlight</option>
+                                <option value="drain">Drain</option>
+                                <option value="other">Other</option>
                             </select>
                         </div>
 
                         <div className="mt-5">
-                            <label className="flex items-center gap-1.5 font-body text-sm font-semibold text-ink mb-2">
-                                <FileText size={15} className="text-cyan" /> Description
-                            </label>
-                            <textarea
+                            <Input
+                                id="description"
+                                label="Description"
+                                icon={FileText}
+                                type="textarea"
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 placeholder="Briefly describe the issue..."
                                 maxLength={500}
-                                className="w-full border border-hairline rounded-lg px-4 py-3 font-body text-ink placeholder:text-ink/40 outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/20 transition-all"
-                                rows="3"
+                                rows={3}
                                 required
                             />
                             <p className="font-body text-xs text-ink/40 text-right mt-1">
@@ -303,33 +305,35 @@ function SubmitReport() {
                             <label className="flex items-center gap-1.5 font-body text-sm font-semibold text-ink mb-2">
                                 <MapPin size={15} className="text-cyan" /> Location
                             </label>
-                            <button
+                            <Button
                                 type="button"
+                                variant="outline"
+                                size="md"
+                                icon={Navigation}
+                                loading={locationStatus === 'fetching'}
                                 onClick={getLocation}
-                                className="w-full flex items-center gap-2 border border-hairline rounded-lg px-4 py-3 font-body text-ink hover:border-cyan transition-colors text-left"
+                                className="w-full !justify-start"
                             >
-                                <MapPin size={16} className="text-pin flex-shrink-0" />
                                 {locationStatus === 'success'
                                     ? `Location captured (${location.lat.toFixed(4)}, ${location.lng.toFixed(4)})`
                                     : locationStatus === 'fetching'
                                     ? 'Getting location...'
                                     : 'Share Current Location'}
-                            </button>
+                            </Button>
                         </div>
 
-                        <motion.button
-                            whileHover={{ scale: 1.015 }}
-                            whileTap={{ scale: 0.98 }}
-                            type="submit"
-                            disabled={loading}
-                            className="w-full flex items-center justify-center gap-2 bg-cyan text-navy font-heading font-bold py-3 rounded-lg mt-7 hover:bg-cyan/90 transition-colors disabled:opacity-50"
-                        >
-                            {loading ? 'Submitting...' : (
-                                <>
-                                    <Send size={17} /> Submit Report
-                                </>
-                            )}
-                        </motion.button>
+                        <div className="mt-7">
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                size="lg"
+                                icon={Send}
+                                loading={loading}
+                                className="w-full"
+                            >
+                                {loading ? 'Submitting...' : 'Submit Report'}
+                            </Button>
+                        </div>
                     </div>
                 </form>
             </div>
