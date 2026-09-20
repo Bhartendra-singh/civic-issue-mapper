@@ -57,21 +57,6 @@ function VerifyEmail() {
     </div>
   );
 
-    // return (
-    //   <div className="min-h-screen bg-paper flex items-center justify-center px-4">
-    //     <div className="bg-white border border-hairline rounded-lg p-8 max-w-md text-center">
-    //         <h2 className="font-heading text-2xl font-bold text-ink mb-4">
-    //         {status === 'verifying' && 'Verifying...'}
-    //         {status === 'success' && 'Email Verified!'}
-    //         {status === 'error' && 'Verification Failed'}
-    //         </h2>
-    //         <p className="font-body text-ink mb-4">{message}</p>
-    //         <Link to="/login" className="text-rust font-body underline">
-    //         Go to Login
-    //         </Link>
-    //     </div>
-    //   </div>
-    // );
 }
 
 
