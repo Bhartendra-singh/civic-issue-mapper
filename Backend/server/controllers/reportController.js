@@ -385,3 +385,20 @@ export const getAccountabilityMetrics = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+
+export const getReportById = async (req, res) => {
+  try {
+    const report = await Report.findById(req.params.id)
+      .populate('department', 'name slaHours');
+
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+
+    res.status(200).json({ report });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};

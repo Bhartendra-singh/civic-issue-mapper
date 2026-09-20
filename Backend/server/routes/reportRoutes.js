@@ -1,5 +1,5 @@
 import express from 'express';
-import { createReport, getMyReports, getAllReports, updateReportStatus, deleteReport, getAnalytics, getAllPublicReports, getPublicStats, editReport, reopenReport, getAccountabilityMetrics } from '../controllers/reportController.js';
+import { createReport, getMyReports, getAllReports, updateReportStatus, deleteReport, getAnalytics, getAllPublicReports, getPublicStats, editReport, reopenReport, getAccountabilityMetrics, getReportById } from '../controllers/reportController.js';
 import { protect, isAdmin, requireVerified } from '../middleware/authMiddleware.js';
 import upload from '../config/multer.js';
 
@@ -18,6 +18,7 @@ router.patch('/:id/status', protect, isAdmin, updateReportStatus);
 router.patch('/:id', protect, upload.array('photos', 4), editReport);
 router.patch('/:id/reopen', protect, reopenReport);
 router.delete('/:id', protect, deleteReport);
+router.get('/:id', getReportById);
 
 
 export default router;
