@@ -40,7 +40,7 @@ export const createDepartment = async (req, res) => {
 
 export const getAllDepartments = async (req, res) => {
     try {
-        const departments = await Department.find().Sort({ name: 1 });
+        const departments = await Department.find().sort({ name: 1 });
         res.status(200).json({ departments });
 
     } catch (error) {
