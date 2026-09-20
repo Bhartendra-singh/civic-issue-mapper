@@ -28,3 +28,14 @@ export const toggleUpvote = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+
+export const getMyUpvotedReportIds = async (req, res) => {
+  try {
+    const upvotes = await Upvote.find({ user: req.user.id }).select('report');
+    const reportIds = upvotes.map((u) => u.report.toString());
+    res.status(200).json({ reportIds });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
