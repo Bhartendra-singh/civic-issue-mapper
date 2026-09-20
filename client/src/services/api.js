@@ -1,177 +1,187 @@
 const API_URL = 'http://localhost:5000/api';
 
+let refreshPromise = null;
+
+async function tryRefreshToken() {
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+      .then((res) => res.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
+async function request(url, options = {}) {
+  let response = await fetch(url, { ...options, credentials: 'include' });
+
+  if (response.status === 401) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      response = await fetch(url, { ...options, credentials: 'include' });
+    }
+  }
+
+  return response;
+}
 
 export const loginUser = async (email, password) => {
-    const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-    });
+  const response = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email, password }),
+  });
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-    }
+  if (!response.ok) {
+    throw new Error(data.message || 'Login failed');
+  }
 
-    return data;
-
+  return data;
 };
-
 
 export const logoutUser = async () => {
-    const response = await fetch(`${API_URL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-    });
+  const response = await fetch(`${API_URL}/auth/logout`, {
+    method: 'POST',
+    credentials: 'include',
+  });
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (!response.ok) {
-        throw new Error(data.message || 'Logout failed');
-    }
+  if (!response.ok) {
+    throw new Error(data.message || 'Logout failed');
+  }
 
-    return data;
-
+  return data;
 };
-
 
 export const signupUser = async (name, email, password) => {
-    const response = await fetch(`${API_URL}/auth/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name, email, password }),
-    });
+  const response = await fetch(`${API_URL}/auth/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ name, email, password }),
+  });
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (!response.ok) {
-        throw new Error(data.message || 'Signup failed');
-    }
+  if (!response.ok) {
+    throw new Error(data.message || 'Signup failed');
+  }
 
-    return data;
+  return data;
 };
-
 
 export const createReport = async (formDataObj) => {
-    const response = await fetch(`${API_URL}/reports`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formDataObj,
-    });
+  const response = await request(`${API_URL}/reports`, {
+    method: 'POST',
+    body: formDataObj,
+  });
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (!response.ok) {
-        throw new Error(data.message || 'Failed to submit report');
-    }
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to submit report');
+  }
 
-    return data;
+  return data;
 };
-
 
 export const getProfile = async () => {
-    const response = await fetch(`${API_URL}/auth/profile`, {
-        credentials: 'include',
-    });
+  const response = await request(`${API_URL}/auth/profile`);
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (!response.ok){
-        throw new Error(data.message || 'Not authenticated');
-    }
+  if (!response.ok) {
+    throw new Error(data.message || 'Not authenticated');
+  }
 
-    return data;
+  return data;
 };
-
 
 export const getMyReports = async () => {
-    const response = await fetch(`${API_URL}/reports/my-reports`, {
-        credentials: 'include',
-    });
+  const response = await request(`${API_URL}/reports/my-reports`);
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch reports');
-    }
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch reports');
+  }
 
-    return data;
+  return data;
 };
-
 
 export const getAllPublicReports = async () => {
-    const response = await fetch(`${API_URL}/reports/public`);
-    const data = await response.json();
+  const response = await fetch(`${API_URL}/reports/public`);
+  const data = await response.json();
 
-    if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch reports');
-    }
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch reports');
+  }
 
-    return data;
+  return data;
 };
 
-
 export const getAllReports = async () => {
-    const response = await fetch(`${API_URL}/reports/all`, {
-        credentials: 'include',
-    });
+  const response = await request(`${API_URL}/reports/all`);
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch reports');
-    }
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch reports');
+  }
 
-    return data;
+  return data;
 };
 
 export const updateReportStatus = async (reportId, status) => {
-    const response = await fetch(`${API_URL}/reports/${reportId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status }),
-    });
+  const response = await request(`${API_URL}/reports/${reportId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (!response.ok) {
-        throw new Error(data.message || 'Failed to update status');
-    }
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update status');
+  }
 
-    return data;
+  return data;
 };
 
-
 export const verifyEmail = async (token) => {
-    const response = await fetch(`${API_URL}/auth/verify-email/${token}`);
+  const response = await fetch(`${API_URL}/auth/verify-email/${token}`);
 
-    const data = await response.json();
+  const data = await response.json();
 
-    if (!response.ok) {
-        throw new Error(data.message || 'Verification failed');
-    }
+  if (!response.ok) {
+    throw new Error(data.message || 'Verification failed');
+  }
 
-    return data;
-}
-
+  return data;
+};
 
 export const forgotPassword = async (email) => {
-    const response = await fetch(`${API_URL}/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-    });
-    const data = await response.json();
-    
-    if (!response.ok) {
-        throw new Error(data.message || 'Request failed');
-    }
+  const response = await fetch(`${API_URL}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  const data = await response.json();
 
-    return data;
+  if (!response.ok) {
+    throw new Error(data.message || 'Request failed');
+  }
+
+  return data;
 };
 
 export const resetPassword = async (token, newPassword) => {
@@ -182,5 +192,221 @@ export const resetPassword = async (token, newPassword) => {
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.message || 'Reset failed');
+  return data;
+};
+
+export const toggleUpvote = async (reportId) => {
+  const response = await request(`${API_URL}/upvotes/${reportId}/toggle`, {
+    method: 'PATCH',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update upvote');
+  }
+
+  return data;
+};
+
+export const reopenReport = async (reportId) => {
+  const response = await request(`${API_URL}/reports/${reportId}/reopen`, {
+    method: 'PATCH',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to reopen report');
+  }
+
+  return data;
+};
+
+export const getComments = async (reportId) => {
+  const response = await fetch(`${API_URL}/comments/${reportId}`);
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch comments');
+  }
+
+  return data;
+};
+
+
+export const getDepartments = async () => {
+  const response = await request(`${API_URL}/departments`);
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch departments');
+  }
+
+  return data;
+};
+
+export const createDepartment = async (name, description, categories) => {
+  const response = await request(`${API_URL}/departments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description, categories }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to create department');
+  }
+
+  return data;
+};
+
+export const getAuditLogs = async () => {
+  const response = await request(`${API_URL}/audit-logs`);
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch audit logs');
+  }
+
+  return data;
+};
+
+export const getAnalytics = async () => {
+  const response = await request(`${API_URL}/reports/analytics`);
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch analytics');
+  }
+
+  return data;
+};
+
+
+export const getMyNotifications = async () => {
+  const response = await request(`${API_URL}/notifications`);
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch notifications');
+  }
+
+  return data;
+};
+
+export const markNotificationRead = async (notificationId) => {
+  const response = await request(`${API_URL}/notifications/${notificationId}/read`, {
+    method: 'PATCH',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update notification');
+  }
+
+  return data;
+};
+
+export const markAllNotificationsRead = async () => {
+  const response = await request(`${API_URL}/notifications/read-all`, {
+    method: 'PATCH',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update notifications');
+  }
+
+  return data;
+};
+
+
+export const getReportById = async (reportId) => {
+  const response = await fetch(`${API_URL}/reports/${reportId}`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch report');
+  }
+
+  return data;
+};
+
+
+export const postComment = async (reportId, text) => {
+  const response = await request(`${API_URL}/comments/${reportId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to post comment');
+  }
+
+  return data;
+};
+
+export const deleteComment = async (commentId) => {
+  const response = await request(`${API_URL}/comments/${commentId}`, {
+    method: 'DELETE',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to delete comment');
+  }
+
+  return data;
+};
+
+export const submitFeedback = async (reportId, rating, comment) => {
+  const response = await request(`${API_URL}/feedback/${reportId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rating, comment }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to submit feedback');
+  }
+
+  return data;
+};
+
+export const getFeedback = async (reportId) => {
+  const response = await fetch(`${API_URL}/feedback/${reportId}`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch feedback');
+  }
+
+  return data;
+};
+
+
+export const getMyUpvotedReportIds = async () => {
+  const response = await request(`${API_URL}/upvotes/my-upvotes`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch upvoted reports');
+  }
+
   return data;
 };

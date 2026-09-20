@@ -39,7 +39,7 @@ mongoose.connect(process.env.MONGODB_URI)
 
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
-app.use('/api/notificatons', notificationRoutes);
+app.use('/api/notifications', notificationRoutes); 
 app.use('/api/upvotes', upvoteRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/departments', departmentRoutes);
