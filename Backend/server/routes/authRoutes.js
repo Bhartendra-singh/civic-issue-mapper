@@ -1,5 +1,6 @@
 import passport from '../config/passport.js';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { signup, login, getProfile, logout, verifyEmail, forgotPassword, resetPassword, updateProfile, googleCallback, refreshAccessToken } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import upload from '../config/multer.js';
@@ -8,12 +9,21 @@ import upload from '../config/multer.js';
 const router = express.Router();
 
 
-router.post('/signup', signup);
-router.post('/login', login);
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: { message: 'Too many attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+
+router.post('/signup', authLimiter, signup);
+router.post('/login', authLimiter, login);
 router.get('/profile', protect, getProfile);
 router.patch('/profile', protect, upload.single('photo'), updateProfile);
 router.get('/verify-email/:token', verifyEmail);
-router.post('/forgot-password', forgotPassword);
+router.post('/forgot-password', authLimiter, forgotPassword);
 router.patch('/reset-password/:token', resetPassword);
 router.post('/logout', logout);
 router.post('/refresh', refreshAccessToken);

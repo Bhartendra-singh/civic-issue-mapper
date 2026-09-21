@@ -1,5 +1,6 @@
 import passport from './config/passport.js';
 import express from 'express';
+import helmet from 'helmet';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -12,9 +13,23 @@ import commentRoutes from './routes/commentRoutes.js';
 import departmentRoutes from './routes/departmentRoutes.js';
 import auditLogRoutes from './routes/auditLogRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
+import compression from 'compression';
 
 
 dotenv.config();    //call this function and it will findout .env file and read it 
+
+
+function sanitizeObject(obj) {
+  if (obj && typeof obj === 'object') {
+    for (const key of Object.keys(obj)) {
+      if (key.startsWith('$') || key.includes('.')) {
+        delete obj[key];
+      } else if (typeof obj[key] === 'object') {
+        sanitizeObject(obj[key]);
+      }
+    }
+  }
+}
 
 const app = express();  //call the express function and it return a object that we store in app variable
 
@@ -26,7 +41,19 @@ app.use(cors({
   credentials: true,
 }));
 
+app.use(helmet());
+app.use(compression()); 
+
+
 app.use(express.json());
+
+app.use((req, res, next) => {
+  sanitizeObject(req.body);
+  sanitizeObject(req.params);
+  sanitizeObject(req.query);
+  next();
+});
+
 app.use(cookieParser());
 app.use(passport.initialize());
 
@@ -49,6 +76,18 @@ app.use('/api/feedback', feedbackRoutes);
 
 app.get('/', (req, res) => {
     res.send('Server is running!');
+});
+
+
+
+// Centralized error handler — catches anything that wasn't handled by a route's own try/catch
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err.stack);
+
+  const statusCode = err.statusCode || 500;
+  const message = statusCode === 500 ? 'Something went wrong on our end.' : err.message;
+
+  res.status(statusCode).json({ message });
 });
 
 
