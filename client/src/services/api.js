@@ -410,3 +410,19 @@ export const getMyUpvotedReportIds = async () => {
 
   return data;
 };
+
+
+export const updateProfile = async (formData) => {
+  const response = await request(`${API_URL}/auth/profile`, {
+    method: 'PATCH',
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update profile');
+  }
+
+  return data;
+};

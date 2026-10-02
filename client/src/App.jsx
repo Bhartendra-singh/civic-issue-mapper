@@ -15,6 +15,7 @@ import VerificationBanner from './components/common/VerificationBanner';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ReportDetail from './pages/ReportDetail';
+import Profile from './pages/Profile';
 
 
 function App() {
@@ -59,6 +60,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/reports/:id" element={<ReportDetail />} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

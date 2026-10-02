@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, LogOut, Bell } from 'lucide-react';
+import { Menu, X, LogOut, Bell, UserCog } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
   getMyNotifications, markNotificationRead, markAllNotificationsRead,
@@ -69,12 +69,65 @@ function NotificationBell({ notifications, unreadCount, isOpen, onToggle, onMark
   );
 }
 
+function ProfileMenu({ user, isOpen, onToggle, onLogout }) {
+  const initial = user.name?.charAt(0).toUpperCase() || '?';
+
+  return (
+    <div className="relative">
+      <button
+        onClick={onToggle}
+        aria-label="Account menu"
+        className="w-9 h-9 rounded-full overflow-hidden border border-cyan-dim bg-cyan-dim text-cyan font-bold text-sm flex items-center justify-center shrink-0 hover:border-cyan transition-colors"
+      >
+        {user.profilePhoto ? (
+          <img src={user.profilePhoto} alt={user.name} className="w-full h-full object-cover" />
+        ) : (
+          initial
+        )}
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 mt-3 w-64 bg-white border border-hairline rounded-xl shadow-xl z-50 overflow-hidden"
+          >
+            <div className="px-4 py-4 border-b border-hairline">
+              <p className="font-heading text-sm font-bold text-ink truncate">{user.name}</p>
+              <p className="font-body text-xs text-ink/50 mt-0.5 truncate">{user.email}</p>
+            </div>
+
+            <Link
+              to="/profile"
+              onClick={onToggle}
+              className="flex items-center gap-2.5 px-4 py-3 text-sm text-ink hover:bg-light transition-colors"
+            >
+              <UserCog size={16} className="text-cyan" /> My Profile
+            </Link>
+
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-status-open hover:bg-light transition-colors text-left"
+            >
+              <LogOut size={16} /> Logout
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -108,6 +161,7 @@ function Navbar() {
   const handleLogout = async () => {
     await logout();
     setIsMenuOpen(false);
+    setProfileOpen(false);
     navigate('/');
   };
 
@@ -121,8 +175,14 @@ function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 bg-navy border-b border-cyan-dim px-6 py-4">
-      {notifOpen && (
-        <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+      {(notifOpen || profileOpen) && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => {
+            setNotifOpen(false);
+            setProfileOpen(false);
+          }}
+        />
       )}
 
       <div className="flex items-center justify-between">
@@ -154,14 +214,22 @@ function Navbar() {
                 notifications={notifications}
                 unreadCount={unreadCount}
                 isOpen={notifOpen}
-                onToggle={() => setNotifOpen((o) => !o)}
+                onToggle={() => {
+                  setNotifOpen((o) => !o);
+                  setProfileOpen(false);
+                }}
                 onMarkRead={handleMarkRead}
                 onMarkAllRead={handleMarkAllRead}
               />
-              <span className="font-body text-text-primary">Hi, {user.name}</span>
-              <Button variant="outlineDark" size="sm" icon={LogOut} onClick={handleLogout}>
-                Logout
-              </Button>
+              <ProfileMenu
+                user={user}
+                isOpen={profileOpen}
+                onToggle={() => {
+                  setProfileOpen((o) => !o);
+                  setNotifOpen(false);
+                }}
+                onLogout={handleLogout}
+              />
             </>
           ) : (
             <>
@@ -175,17 +243,31 @@ function Navbar() {
           )}
         </div>
 
-        {/* Mobile — bell (if logged in) + hamburger, always visible below md */}
+        {/* Mobile — bell + avatar (if logged in) + hamburger, always visible below md */}
         <div className="flex items-center gap-3 md:hidden">
           {user && (
-            <NotificationBell
-              notifications={notifications}
-              unreadCount={unreadCount}
-              isOpen={notifOpen}
-              onToggle={() => setNotifOpen((o) => !o)}
-              onMarkRead={handleMarkRead}
-              onMarkAllRead={handleMarkAllRead}
-            />
+            <>
+              <NotificationBell
+                notifications={notifications}
+                unreadCount={unreadCount}
+                isOpen={notifOpen}
+                onToggle={() => {
+                  setNotifOpen((o) => !o);
+                  setProfileOpen(false);
+                }}
+                onMarkRead={handleMarkRead}
+                onMarkAllRead={handleMarkAllRead}
+              />
+              <ProfileMenu
+                user={user}
+                isOpen={profileOpen}
+                onToggle={() => {
+                  setProfileOpen((o) => !o);
+                  setNotifOpen(false);
+                }}
+                onLogout={handleLogout}
+              />
+            </>
           )}
           <button
             onClick={() => setIsMenuOpen((open) => !open)}
@@ -197,7 +279,7 @@ function Navbar() {
         </div>
       </div>
 
-      {/* Mobile dropdown panel */}
+      {/* Mobile dropdown panel — just nav links now, profile/logout live in the avatar menu above */}
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div
@@ -221,14 +303,7 @@ function Navbar() {
                   </Link>
                 ))}
 
-              {user ? (
-                <>
-                  <span className="font-body text-text-primary">Hi, {user.name}</span>
-                  <Button variant="outlineDark" size="sm" icon={LogOut} onClick={handleLogout}>
-                    Logout
-                  </Button>
-                </>
-              ) : (
+              {!user && (
                 <div className="flex gap-3">
                   <Link
                     to="/signup"
