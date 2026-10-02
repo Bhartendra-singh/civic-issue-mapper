@@ -8,7 +8,7 @@ function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-paper flex items-center justify-center">
+      <div className="min-h-screen bg-light flex items-center justify-center">
         <p className="font-body text-ink">Loading...</p>
       </div>
     );
