@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, ThumbsUp, MessageCircle, RotateCcw, Star,
-  Loader2, AlertTriangle, Image as ImageIcon, Send, Trash2,
+  Loader2, AlertTriangle, Image as ImageIcon, Send, Trash2, Link2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { timeAgo } from '../utils/timeAgo';
 import {
   getReportById, toggleUpvote, reopenReport,
   getComments, postComment, deleteComment,
-  getFeedback, submitFeedback, getMyUpvotedReportIds,
+  getFeedback, submitFeedback, getMyUpvotedReportIds, getReportsByCluster
 } from '../services/api';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -73,6 +73,9 @@ function ReportDetail() {
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [commentError, setCommentError] = useState('');
 
+  const [similarReports, setSimilarReports] = useState([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+
   const [feedback, setFeedback] = useState(null);
   const [feedbackLoading, setFeedbackLoading] = useState(true);
   const [feedbackRating, setFeedbackRating] = useState(0);
@@ -107,6 +110,22 @@ function ReportDetail() {
       .catch(() => setFeedback(null))
       .finally(() => setFeedbackLoading(false));
   }, [id, user]); 
+
+  useEffect(() => {
+  if (!report?.clusterId) {
+    setSimilarReports([]);
+    return;
+  }
+
+  setSimilarLoading(true);
+  getReportsByCluster(report.clusterId)
+    .then((data) => {
+      const others = data.reports.filter((r) => r._id !== report._id);
+      setSimilarReports(others);
+    })
+    .catch(() => setSimilarReports([]))
+    .finally(() => setSimilarLoading(false));
+  }, [report?._id]);
 
   const requireLogin = () => {
     navigate('/login', { state: { from: location } });
@@ -272,6 +291,46 @@ function ReportDetail() {
             <p className="font-heading text-lg font-bold text-ink mb-2">Description</p>
             <p className="font-body text-sm text-ink/80 leading-relaxed">{report.description}</p>
           </Card>
+
+          {report.clusterId && (
+            <Card padding="lg">
+              <p className="font-heading text-lg font-bold text-ink mb-3 flex items-center gap-2">
+                <Link2 size={18} className="text-cyan" /> Similar Reports Nearby
+              </p>
+              <p className="font-body text-xs text-ink/50 mb-4">
+                Other citizens have reported the same issue near this location.
+              </p>
+
+              {similarLoading ? (
+                <Loader2 size={20} className="text-cyan animate-spin mx-auto" />
+              ) : similarReports.length === 0 ? (
+                <p className="font-body text-sm text-ink/50">No other reports in this group.</p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {similarReports.map((r) => (
+                    <button
+                      key={r._id}
+                      onClick={() => navigate(`/reports/${r._id}`)}
+                      className="flex items-center gap-3 text-left border border-hairline rounded-xl p-3 hover:border-cyan transition-colors"
+                    >
+                      <div className="w-12 h-12 rounded-lg bg-panel overflow-hidden shrink-0 flex items-center justify-center">
+                        {r.photoUrls?.[0]?.url ? (
+                          <img src={r.photoUrls[0].url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon size={16} className="text-text-muted" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-body text-sm text-ink truncate">{r.description}</p>
+                        <p className="font-body text-xs text-ink/40 mt-0.5">{timeAgo(r.createdAt)}</p>
+                      </div>
+                      <Badge status={r.status} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
 
           {/* Comments */}
           <Card padding="lg">

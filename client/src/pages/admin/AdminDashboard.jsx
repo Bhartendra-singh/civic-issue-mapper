@@ -5,7 +5,7 @@ import {
 import {
   LayoutDashboard, ClipboardList, Building2, ScrollText,
   Loader2, AlertTriangle, Plus, Image as ImageIcon,
-  RefreshCw, Trash2, FolderPlus, Users, Clock, CheckCircle2,
+  RefreshCw, Trash2, FolderPlus, Users, Clock, CheckCircle2, Link2 
 } from 'lucide-react';
 import {
   getAllReports, updateReportStatus, getAnalytics,
@@ -292,6 +292,7 @@ function AdminDashboard() {
                     <tr>
                       <th className="text-left px-4 py-3 text-ink/60 font-semibold">Photo</th>
                       <th className="text-left px-4 py-3 text-ink/60 font-semibold">Category</th>
+                      <th className="text-left px-4 py-3 text-ink/60 font-semibold">Cluster</th>
                       <th className="text-left px-4 py-3 text-ink/60 font-semibold">Description</th>
                       <th className="text-left px-4 py-3 text-ink/60 font-semibold">Reported By</th>
                       <th className="text-left px-4 py-3 text-ink/60 font-semibold">Status</th>
@@ -310,11 +311,22 @@ function AdminDashboard() {
                               <div className="w-12 h-12 rounded-lg bg-light flex items-center justify-center">
                                 <ImageIcon size={16} className="text-ink/30" />
                               </div>
-                            )}
+                            )} 
                           </td>
                           <td className="px-4 py-3">
                             <Badge status="neutral">{CATEGORY_LABELS[report.category] || report.category}</Badge>
                           </td>
+
+                          <td className="px-4 py-3">
+                            {report.clusterId ? (
+                              <span className="flex items-center gap-1 text-xs text-cyan font-semibold">
+                                <Link2 size={12} /> Duplicate
+                              </span>
+                            ) : (
+                              <span className="text-xs text-ink/30">—</span>
+                            )}
+                          </td>
+
                           <td className="px-4 py-3 text-ink max-w-xs truncate" title={report.description}>
                             {report.description}
                           </td>

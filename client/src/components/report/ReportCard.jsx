@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, ThumbsUp, MessageCircle, RotateCcw, Image as ImageIcon } from 'lucide-react';
+import { MapPin, ThumbsUp, MessageCircle, RotateCcw, Image as ImageIcon, Link2 } from 'lucide-react';
 import { timeAgo } from '../../utils/timeAgo';
 import { toggleUpvote, reopenReport, getComments } from '../../services/api';
 import Card from '../ui/Card';
@@ -102,6 +102,14 @@ export default function ReportCard({ report, onReportUpdate, initiallyUpvoted = 
           <Badge status="neutral">{CATEGORY_LABELS[report.category] || report.category}</Badge>
           <Badge status={report.status} />
         </div>
+
+
+        {report.clusterId && (
+          <div className="flex items-center gap-1.5 text-xs text-cyan font-semibold mt-2">
+            <Link2 size={12} />
+            Similar reports found nearby
+          </div>
+        )}
 
         <p className="font-body text-sm text-ink mt-3">{report.description}</p>
 

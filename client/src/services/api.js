@@ -426,3 +426,15 @@ export const updateProfile = async (formData) => {
 
   return data;
 };
+
+
+export const getReportsByCluster = async (clusterId) => {
+  const response = await fetch(`${API_URL}/reports/cluster/${clusterId}`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch similar reports');
+  }
+
+  return data;
+};
