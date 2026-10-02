@@ -448,30 +448,39 @@ export const getReportById = async (req, res) => {
 };
 
 
+export const performClustering = async () => {
+    const activeReports = await Report.find({
+        status: { $in: ['pending', 'in-progress'] }
+    });
+
+    const clusterMap = await clusterActiveReports(activeReports);
+
+    let updatedCount = 0;
+
+    for (const report of activeReports) {
+        const newClusterId = clusterMap[report._id.toString()] || null;
+
+        if (report.clusterId !== newClusterId) {
+            report.clusterId = newClusterId;
+            await report.save();
+            updatedCount++;
+        }
+    }
+
+    return {
+        totalReportsChecked: activeReports.length,
+        reportsUpdated: updatedCount,
+    };
+};
+
+
 export const runClustering = async (req, res) => {
     try {
-        const activeReports = await Report.find({
-            status: { $in: ['pending', 'in-progress'] }
-        });
-
-        const clusterMap = await clusterActiveReports(activeReports);
-
-        let updatedCount = 0;
-
-        for (const report of activeReports) {
-            const newClusterId = clusterMap[report._id.toString()] || null;
-
-            if (report.clusterId !== newClusterId) {
-                report.clusterId = newClusterId;
-                await report.save();
-                updatedCount++;
-            }
-        }
+        const result = await performClustering();
 
         res.status(200).json({
             message: 'Clustering completed',
-            totalReportsChecked: activeReports.length,
-            reportsUpdated: updatedCount,
+            ...result,
         });
 
     } catch (error) {
@@ -494,3 +503,5 @@ export const getReportsByCluster = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+

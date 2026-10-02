@@ -15,6 +15,7 @@ import auditLogRoutes from './routes/auditLogRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import compression from 'compression';
 import './config/redis.js';
+import { startClusteringCron } from './cron/clusteringCron.js';
 
 
 dotenv.config();    //call this function and it will findout .env file and read it 
@@ -64,6 +65,8 @@ mongoose.connect(process.env.MONGODB_URI)
     .catch((err) => console.log('MongoDB connection error:', err));
 
 
+
+startClusteringCron();
 
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
