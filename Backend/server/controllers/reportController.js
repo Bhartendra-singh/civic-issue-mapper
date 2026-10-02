@@ -84,6 +84,10 @@ export const updateReportStatus = async (req, res) => {
             report.resolvedAt = new Date();
         }
 
+        if (status !== 'pending' && status !== 'in-progress') {
+            report.clusterId = null;
+        }
+
         await report.save();
 
         await createStatusChangeNotification(report.user, report._id, report.category, report.status);
