@@ -76,6 +76,11 @@ const reportSchema = new mongoose.Schema(
             default: 0,
         },
 
+        clusterId: {
+            type: String,
+            default: null,
+        }, 
+
         resolvedAt: {
             type: Date,
             default: null,

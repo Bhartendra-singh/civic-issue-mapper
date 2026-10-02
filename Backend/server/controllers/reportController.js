@@ -5,6 +5,7 @@ import { getDepartmentByCategory } from './departmentController.js';
 import { createAuditLog } from './auditLogController.js';
 import cloudinary from '../config/cloudinary.js';
 import redisClient from '../config/redis.js';
+import { clusterActiveReports } from '../services/clusteringService.js';
 
 
 export const createReport = async (req, res) => {
@@ -444,4 +445,52 @@ export const getReportById = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
+};
+
+
+export const runClustering = async (req, res) => {
+    try {
+        const activeReports = await Report.find({
+            status: { $in: ['pending', 'in-progress'] }
+        });
+
+        const clusterMap = await clusterActiveReports(activeReports);
+
+        let updatedCount = 0;
+
+        for (const report of activeReports) {
+            const newClusterId = clusterMap[report._id.toString()] || null;
+
+            if (report.clusterId !== newClusterId) {
+                report.clusterId = newClusterId;
+                await report.save();
+                updatedCount++;
+            }
+        }
+
+        res.status(200).json({
+            message: 'Clustering completed',
+            totalReportsChecked: activeReports.length,
+            reportsUpdated: updatedCount,
+        });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+
+export const getReportsByCluster = async (req, res) => {
+    try {
+        const { clusterId } = req.params;
+
+        const reports = await Report.find({ clusterId })
+            .select('category description location status createdAt photoUrls');
+
+        res.status(200).json({ reports });
+
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
 };
