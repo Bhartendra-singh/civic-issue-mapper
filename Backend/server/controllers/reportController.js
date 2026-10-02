@@ -4,6 +4,7 @@ import { createStatusChangeNotification } from './notificationController.js';
 import { getDepartmentByCategory } from './departmentController.js';
 import { createAuditLog } from './auditLogController.js';
 import cloudinary from '../config/cloudinary.js';
+import redisClient from '../config/redis.js';
 
 
 export const createReport = async (req, res) => {
@@ -141,6 +142,17 @@ export const deleteReport = async (req, res) => {
 
 export const getAnalytics = async (req, res) => {
     try {
+        const cacheKey = 'admin-analytics';
+
+        const cachedAnalytics = await redisClient.get(cacheKey);
+
+        if (cachedAnalytics) {
+            console.log('Serving admin-analytics from Redis cache');
+            return res.status(200).json(JSON.parse(cachedAnalytics));
+        }
+
+        console.log('Cache miss — querying MongoDB for admin-analytics');
+
         const totalReports = await Report.countDocuments();
 
         const statusCounts = await Report.aggregate([
@@ -153,18 +165,21 @@ export const getAnalytics = async (req, res) => {
 
         const activeUsers = await User.countDocuments({ role: 'citizen' });
 
-        res.status(200).json({
+        const analytics = {
             totalReports,
             statusCounts,
             categoryCounts,
             activeUsers,
-        });
+        };
+
+        await redisClient.set(cacheKey, JSON.stringify(analytics), 'EX', 60);
+
+        res.status(200).json(analytics);
 
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
-
 
 export const getAllPublicReports = async (req, res) => {
     try {
@@ -178,15 +193,26 @@ export const getAllPublicReports = async (req, res) => {
 
 export const getPublicStats = async (req, res) => {
     try {
+        const cacheKey = 'public-stats';
+
+        const cachedStats = await redisClient.get(cacheKey);
+
+        if (cachedStats) {
+            console.log('Serving public-stats from Redis cache');
+            return res.status(200).json(JSON.parse(cachedStats));
+        }
+
+        console.log('Cache miss — querying MongoDB for public-stats');
+
         const totalReports = await Report.countDocuments();
         const resolvedCount = await Report.countDocuments({ status: 'resolved' });
         const activeUsers = await User.countDocuments({ role: 'citizen' });
 
-        res.status(200).json({
-            totalReports,
-            resolvedCount,
-            activeUsers,
-        });
+        const stats = { totalReports, resolvedCount, activeUsers };
+
+        await redisClient.set(cacheKey, JSON.stringify(stats), 'EX', 60);
+
+        res.status(200).json(stats);
     
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
@@ -313,6 +339,19 @@ export const reopenReport = async (req, res) => {
 
 export const getAccountabilityMetrics = async (req, res) => {
     try {
+
+        const cacheKey = 'accountability-metrics';
+
+        const cachedMetrics = await redisClient.get(cacheKey);
+
+        if (cachedMetrics) {
+            console.log('Serving accountability-metrics from Redis cache');
+            return res.status(200).json(JSON.parse(cachedMetrics));
+        }
+
+        console.log('Cache miss — querying MongoDB for accountability-metrics');
+
+
         const totalEverResolved = await Report.countDocuments({
             status: { $in: ['resolved', 'reopened'] }
         });
@@ -369,7 +408,7 @@ export const getAccountabilityMetrics = async (req, res) => {
             medianResolutionDays = Number(medianResolutionDays.toFixed(1));
         }
 
-        res.status(200).json({
+        const metrics = {
             reopenRate,
             slaBreachRate: breachRate,
             medianResolutionDays,
@@ -378,7 +417,11 @@ export const getAccountabilityMetrics = async (req, res) => {
                 activeReports: activeReports.length,
                 resolvedWithTimestamp: resolvedReports.length,
             },
-        });
+        };
+
+        await redisClient.set(cacheKey, JSON.stringify(metrics), 'EX', 60);
+
+        res.status(200).json(metrics);
 
     } catch (error) {
         console.log(error);

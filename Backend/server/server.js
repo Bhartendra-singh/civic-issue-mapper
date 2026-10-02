@@ -14,6 +14,7 @@ import departmentRoutes from './routes/departmentRoutes.js';
 import auditLogRoutes from './routes/auditLogRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import compression from 'compression';
+import './config/redis.js';
 
 
 dotenv.config();    //call this function and it will findout .env file and read it 

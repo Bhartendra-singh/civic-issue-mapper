@@ -4,6 +4,8 @@ import rateLimit from 'express-rate-limit';
 import { signup, login, getProfile, logout, verifyEmail, forgotPassword, resetPassword, updateProfile, googleCallback, refreshAccessToken } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import upload from '../config/multer.js';
+import { RedisStore } from 'rate-limit-redis';
+import redisClient from '../config/redis.js';
 
 
 const router = express.Router();
@@ -15,6 +17,9 @@ const authLimiter = rateLimit({
   message: { message: 'Too many attempts. Please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RedisStore({
+    sendCommand: (...args) => redisClient.call(...args),
+  }),
 });
 
 
