@@ -1,5 +1,11 @@
 import express from 'express';
-import { createReport, getMyReports, getAllReports, updateReportStatus, deleteReport, getAnalytics, getAllPublicReports, getPublicStats, editReport, reopenReport, getAccountabilityMetrics, getReportById, runClustering, getReportsByCluster,  recalculateAllPriorityScores } from '../controllers/reportController.js';
+import { 
+createReport, getMyReports, getAllReports, updateReportStatus,
+deleteReport, getAnalytics, getAllPublicReports, getPublicStats, 
+editReport, reopenReport, getAccountabilityMetrics, getReportById,
+runClustering, getReportsByCluster, recalculateAllPriorityScores, getCategorySuggestion
+} from '../controllers/reportController.js';
+
 import { protect, isAdmin, requireVerified } from '../middleware/authMiddleware.js';
 import upload from '../config/multer.js';
 
@@ -17,6 +23,7 @@ router.get('/accountability', getAccountabilityMetrics);
 router.post('/run-clustering', protect, isAdmin, runClustering);
 router.post('/recalculate-priority', protect, isAdmin, recalculateAllPriorityScores);
 router.get('/cluster/:clusterId', getReportsByCluster);
+router.post('/suggest-category', getCategorySuggestion);
 router.patch('/:id/status', protect, isAdmin, updateReportStatus);
 router.patch('/:id', protect, upload.array('photos', 4), editReport);
 router.patch('/:id/reopen', protect, reopenReport);

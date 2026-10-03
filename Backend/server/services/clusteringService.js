@@ -21,3 +21,21 @@ export const clusterActiveReports = async (reports) => {
         return {};
     }
 };
+
+
+export const suggestCategory = async (description) => {
+    try {
+        const response = await fetch('http://localhost:8000/suggest-category', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description }),
+        });
+
+        const data = await response.json();
+        return data;
+
+    } catch (error) {
+        console.error('Category suggestion service error:', error.message);
+        return null;
+    }
+};

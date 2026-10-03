@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from sklearn.cluster import DBSCAN
 import numpy as np
+from category_classifier import predict_category
 
 
 app = FastAPI()
@@ -42,3 +43,10 @@ def cluster_reports(data: dict):
                 results[r["id"]] = f"{category}-{cluster_label}"
 
     return {"clusters": results}
+
+
+@app.post("/suggest-category")
+def suggest_category(data: dict):
+    description = data["description"]
+    result = predict_category(description)
+    return result

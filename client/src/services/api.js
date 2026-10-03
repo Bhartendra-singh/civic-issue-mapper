@@ -438,3 +438,15 @@ export const getReportsByCluster = async (clusterId) => {
 
   return data;
 };
+
+
+export const suggestCategory = async (description) => {
+  const response = await fetch(`${API_URL}/reports/suggest-category`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  });
+
+  const data = await response.json();
+  return data;
+};

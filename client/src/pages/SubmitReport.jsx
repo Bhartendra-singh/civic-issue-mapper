@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MapPin, Leaf, ShieldCheck, Zap, Tag, FileText, Camera, Send, Navigation } from 'lucide-react';
-import { createReport } from '../services/api';
+import { createReport, suggestCategory } from '../services/api';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 
@@ -13,6 +13,7 @@ function SubmitReport() {
 
     const [category, setCategory] = useState(prefill.category || 'pothole');
     const [description, setDescription] = useState(prefill.description || '');
+    const [suggestion, setSuggestion] = useState(null);
     const [photo, setPhoto] = useState(null);
     const [location, setLocation] = useState({ lat: null, lng: null });
     const [locationStatus, setLocationStatus] = useState('idle');
@@ -47,6 +48,29 @@ function SubmitReport() {
     const handlePhotoChange = (e) => {
         setPhoto(e.target.files[0]);
     };
+
+
+    useEffect(() => {
+  if (description.trim().length < 5) {
+    setSuggestion(null);
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    suggestCategory(description)
+      .then((data) => {
+        if (data.category && data.category !== category) {
+          setSuggestion(data);
+        } else {
+          setSuggestion(null);
+        }
+      })
+      .catch(() => setSuggestion(null));
+  }, 600);
+
+  return () => clearTimeout(timer);
+}, [description]);
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -242,41 +266,59 @@ function SubmitReport() {
                             </div>
                         )}
 
-                        <div className="mt-6">
-                            <label className="flex items-center gap-1.5 font-body text-sm font-semibold text-ink mb-2">
-                                <Tag size={15} className="text-cyan" /> Category
-                            </label>
-                            <select
-                                value={category}
-                                onChange={(e) => setCategory(e.target.value)}
-                                className="w-full border border-hairline rounded-lg px-4 py-3 font-body text-ink outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/20 transition-all"
-                            >
-                                <option value="pothole">Pothole</option>
-                                <option value="garbage">Garbage</option>
-                                <option value="waterlogging">Waterlogging</option>
-                                <option value="streetlight">Streetlight</option>
-                                <option value="drain">Drain</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
+                    <div className="mt-6">
+                        <Input
+                            id="description"
+                            label="Description"
+                            icon={FileText}
+                            type="textarea"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Briefly describe the issue..."
+                            maxLength={500}
+                            rows={3}
+                            required
+                        />
+                        <p className="font-body text-xs text-ink/40 text-right mt-1">
+                            {description.length}/500
+                        </p>
 
-                        <div className="mt-5">
-                            <Input
-                                id="description"
-                                label="Description"
-                                icon={FileText}
-                                type="textarea"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Briefly describe the issue..."
-                                maxLength={500}
-                                rows={3}
-                                required
-                            />
-                            <p className="font-body text-xs text-ink/40 text-right mt-1">
-                                {description.length}/500
-                            </p>
-                        </div>
+                        {suggestion && (
+                            <div className="flex items-center justify-between gap-3 bg-cyan-dim/30 border border-cyan-dim rounded-lg px-4 py-2.5 mt-2">
+                                <p className="font-body text-xs text-ink">
+                                    Did you mean <span className="font-semibold text-cyan capitalize">{suggestion.category}</span>?
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setCategory(suggestion.category);
+                                        setSuggestion(null);
+                                    }}
+                                    className="font-body text-xs font-semibold text-cyan hover:underline shrink-0"
+                                >
+                                    Use this
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mt-5">
+                        <label className="flex items-center gap-1.5 font-body text-sm font-semibold text-ink mb-2">
+                            <Tag size={15} className="text-cyan" /> Category
+                        </label>
+                        <select
+                            value={category}
+                            onChange={(e) => setCategory(e.target.value)}
+                            className="w-full border border-hairline rounded-lg px-4 py-3 font-body text-ink outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/20 transition-all"
+                        >
+                            <option value="pothole">Pothole</option>
+                            <option value="garbage">Garbage</option>
+                            <option value="waterlogging">Waterlogging</option>
+                            <option value="streetlight">Streetlight</option>
+                            <option value="drain">Drain</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
 
                         <div className="mt-5">
                             <label className="flex items-center gap-1.5 font-body text-sm font-semibold text-ink mb-2">

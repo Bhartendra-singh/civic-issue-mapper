@@ -5,8 +5,9 @@ import { getDepartmentByCategory } from './departmentController.js';
 import { createAuditLog } from './auditLogController.js';
 import cloudinary from '../config/cloudinary.js';
 import redisClient from '../config/redis.js';
-import { clusterActiveReports } from '../services/clusteringService.js';
+import { clusterActiveReports, suggestCategory } from '../services/clusteringService.js';
 import { calculatePriorityScore } from '../utils/priorityScore.js';
+
 
 
 export const createReport = async (req, res) => {
@@ -536,3 +537,21 @@ export const getReportsByCluster = async (req, res) => {
     }
 };
 
+
+
+export const getCategorySuggestion = async (req, res) => {
+    try {
+        const { description } = req.body;
+
+        if (!description || description.trim().length < 5) {
+            return res.status(200).json({ category: null, confidence: 0 });
+        }
+
+        const suggestion = await suggestCategory(description);
+
+        res.status(200).json(suggestion || { category: null, confidence: 0 });
+
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};

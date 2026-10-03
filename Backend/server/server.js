@@ -14,7 +14,7 @@ import departmentRoutes from './routes/departmentRoutes.js';
 import auditLogRoutes from './routes/auditLogRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import compression from 'compression';
-import './config/redis.js';
+import './config/redis.js'; 
 import { startClusteringCron } from './cron/clusteringCron.js';
 
 
