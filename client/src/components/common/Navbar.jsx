@@ -8,6 +8,8 @@ import {
 } from '../../services/api';
 import { timeAgo } from '../../utils/timeAgo';
 import Button, { getButtonClasses } from '../ui/Button';
+import ChatWidget from './ChatWidget';
+
 
 function NotificationBell({ notifications, unreadCount, isOpen, onToggle, onMarkRead, onMarkAllRead }) {
   return (
@@ -174,159 +176,162 @@ function Navbar() {
   ];
 
   return (
-    <nav className="sticky top-0 z-50 bg-navy border-b border-cyan-dim px-6 py-4">
-      {(notifOpen || profileOpen) && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => {
-            setNotifOpen(false);
-            setProfileOpen(false);
-          }}
-        />
-      )}
-
-      <div className="flex items-center justify-between">
-        <Link
-          to="/"
-          onClick={() => setIsMenuOpen(false)}
-          className="font-heading text-xl font-bold text-text-primary"
-        >
-          Civic <span className="text-cyan">Map</span>
-        </Link>
-
-        {/* Desktop nav — hidden below md breakpoint */}
-        <div className="hidden md:flex items-center gap-6">
-          {navLinks
-            .filter((link) => link.show)
-            .map((link) => (
-              <Link
-                key={link.to}
-                to={link.to}
-                className="font-body text-text-muted hover:text-cyan transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
-
-          {user ? (
-            <>
-              <NotificationBell
-                notifications={notifications}
-                unreadCount={unreadCount}
-                isOpen={notifOpen}
-                onToggle={() => {
-                  setNotifOpen((o) => !o);
-                  setProfileOpen(false);
-                }}
-                onMarkRead={handleMarkRead}
-                onMarkAllRead={handleMarkAllRead}
-              />
-              <ProfileMenu
-                user={user}
-                isOpen={profileOpen}
-                onToggle={() => {
-                  setProfileOpen((o) => !o);
-                  setNotifOpen(false);
-                }}
-                onLogout={handleLogout}
-              />
-            </>
-          ) : (
-            <>
-              <Link to="/signup" className={getButtonClasses({ variant: 'outlineDark', size: 'sm' })}>
-                Sign Up
-              </Link>
-              <Link to="/login" className={getButtonClasses({ variant: 'primary', size: 'sm' })}>
-                Login
-              </Link>
-            </>
-          )}
-        </div>
-
-        {/* Mobile — bell + avatar (if logged in) + hamburger, always visible below md */}
-        <div className="flex items-center gap-3 md:hidden">
-          {user && (
-            <>
-              <NotificationBell
-                notifications={notifications}
-                unreadCount={unreadCount}
-                isOpen={notifOpen}
-                onToggle={() => {
-                  setNotifOpen((o) => !o);
-                  setProfileOpen(false);
-                }}
-                onMarkRead={handleMarkRead}
-                onMarkAllRead={handleMarkAllRead}
-              />
-              <ProfileMenu
-                user={user}
-                isOpen={profileOpen}
-                onToggle={() => {
-                  setProfileOpen((o) => !o);
-                  setNotifOpen(false);
-                }}
-                onLogout={handleLogout}
-              />
-            </>
-          )}
-          <button
-            onClick={() => setIsMenuOpen((open) => !open)}
-            aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-            className="text-text-primary p-1"
-          >
-            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile dropdown panel — just nav links now, profile/logout live in the avatar menu above */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="md:hidden overflow-hidden"
-          >
-            <div className="flex flex-col items-start gap-4 pt-5">
-              {navLinks
-                .filter((link) => link.show)
-                .map((link) => (
-                  <Link
-                    key={link.to}
-                    to={link.to}
-                    onClick={() => setIsMenuOpen(false)}
-                    className="font-body text-text-muted hover:text-cyan transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-
-              {!user && (
-                <div className="flex gap-3">
-                  <Link
-                    to="/signup"
-                    onClick={() => setIsMenuOpen(false)}
-                    className={getButtonClasses({ variant: 'outlineDark', size: 'sm' })}
-                  >
-                    Sign Up
-                  </Link>
-                  <Link
-                    to="/login"
-                    onClick={() => setIsMenuOpen(false)}
-                    className={getButtonClasses({ variant: 'primary', size: 'sm' })}
-                  >
-                    Login
-                  </Link>
-                </div>
-              )}
-            </div>
-          </motion.div>
+    <>
+      <nav className="sticky top-0 z-50 bg-navy border-b border-cyan-dim px-6 py-4">
+        {(notifOpen || profileOpen) && (
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => {
+              setNotifOpen(false);
+              setProfileOpen(false);
+            }}
+          />
         )}
-      </AnimatePresence>
-    </nav>
-  );
-}
+
+        <div className="flex items-center justify-between">
+          <Link
+            to="/"
+            onClick={() => setIsMenuOpen(false)}
+            className="font-heading text-xl font-bold text-text-primary"
+          >
+            Civic <span className="text-cyan">Map</span>
+          </Link>
+
+          {/* Desktop nav — hidden below md breakpoint */}
+          <div className="hidden md:flex items-center gap-6">
+            {navLinks
+              .filter((link) => link.show)
+              .map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className="font-body text-text-muted hover:text-cyan transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ))}
+
+            {user ? (
+              <>
+                <NotificationBell
+                  notifications={notifications}
+                  unreadCount={unreadCount}
+                  isOpen={notifOpen}
+                  onToggle={() => {
+                    setNotifOpen((o) => !o);
+                    setProfileOpen(false);
+                  }}
+                  onMarkRead={handleMarkRead}
+                  onMarkAllRead={handleMarkAllRead}
+                />
+                <ProfileMenu
+                  user={user}
+                  isOpen={profileOpen}
+                  onToggle={() => {
+                    setProfileOpen((o) => !o);
+                    setNotifOpen(false);
+                  }}
+                  onLogout={handleLogout}
+                />
+              </>
+            ) : (
+              <>
+                <Link to="/signup" className={getButtonClasses({ variant: 'outlineDark', size: 'sm' })}>
+                  Sign Up
+                </Link>
+                <Link to="/login" className={getButtonClasses({ variant: 'primary', size: 'sm' })}>
+                  Login
+                </Link>
+              </>
+            )}
+          </div>
+
+          {/* Mobile — bell + avatar (if logged in) + hamburger, always visible below md */}
+          <div className="flex items-center gap-3 md:hidden">
+            {user && (
+              <>
+                <NotificationBell
+                  notifications={notifications}
+                  unreadCount={unreadCount}
+                  isOpen={notifOpen}
+                  onToggle={() => {
+                    setNotifOpen((o) => !o);
+                    setProfileOpen(false);
+                  }}
+                  onMarkRead={handleMarkRead}
+                  onMarkAllRead={handleMarkAllRead}
+                />
+                <ProfileMenu
+                  user={user}
+                  isOpen={profileOpen}
+                  onToggle={() => {
+                    setProfileOpen((o) => !o);
+                    setNotifOpen(false);
+                  }}
+                  onLogout={handleLogout}
+                />
+              </>
+            )}
+            <button
+              onClick={() => setIsMenuOpen((open) => !open)}
+              aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+              className="text-text-primary p-1"
+            >
+              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile dropdown panel — just nav links now, profile/logout live in the avatar menu above */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="md:hidden overflow-hidden"
+            >
+              <div className="flex flex-col items-start gap-4 pt-5">
+                {navLinks
+                  .filter((link) => link.show)
+                  .map((link) => (
+                    <Link
+                      key={link.to}
+                      to={link.to}
+                      onClick={() => setIsMenuOpen(false)}
+                      className="font-body text-text-muted hover:text-cyan transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+
+                {!user && (
+                  <div className="flex gap-3">
+                    <Link
+                      to="/signup"
+                      onClick={() => setIsMenuOpen(false)}
+                      className={getButtonClasses({ variant: 'outlineDark', size: 'sm' })}
+                    >
+                      Sign Up
+                    </Link>
+                    <Link
+                      to="/login"
+                      onClick={() => setIsMenuOpen(false)}
+                      className={getButtonClasses({ variant: 'primary', size: 'sm' })}
+                    >
+                      Login
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </nav>
+      {user && <ChatWidget />}
+    </>
+    );
+  }
 
 export default Navbar;
