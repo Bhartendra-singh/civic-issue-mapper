@@ -17,6 +17,7 @@ import compression from 'compression';
 import './config/redis.js'; 
 import { startClusteringCron } from './cron/clusteringCron.js';
 import { startSlaCron } from './cron/slaCron.js';
+import chatRoutes from './routes/chatRoutes.js';
 
 
 dotenv.config();    //call this function and it will findout .env file and read it 
@@ -73,6 +74,7 @@ startSlaCron();
 
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/chat', chatRoutes);
 app.use('/api/notifications', notificationRoutes); 
 app.use('/api/upvotes', upvoteRoutes);
 app.use('/api/comments', commentRoutes);

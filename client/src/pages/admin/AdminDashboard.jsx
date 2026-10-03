@@ -5,11 +5,12 @@ import {
 import {
   LayoutDashboard, ClipboardList, Building2, ScrollText,
   Loader2, AlertTriangle, Plus, Image as ImageIcon,
-  RefreshCw, Trash2, FolderPlus, Users, Clock, CheckCircle2, Link2 
+  RefreshCw, Trash2, FolderPlus, Users, Clock, CheckCircle2, Link2,
+  MessageSquare, Send, Bot, Sparkles,
 } from 'lucide-react';
 import {
   getAllReports, updateReportStatus, getAnalytics,
-  getDepartments, createDepartment, getAuditLogs,
+  getDepartments, createDepartment, getAuditLogs, sendAdminChatQuery,
 } from '../../services/api';
 import { timeAgo } from '../../utils/timeAgo';
 import Badge from '../../components/ui/Badge';
@@ -40,6 +41,7 @@ const TABS = [
   { id: 'reports', label: 'Reports', icon: ClipboardList },
   { id: 'departments', label: 'Departments', icon: Building2 },
   { id: 'audit', label: 'Audit Log', icon: ScrollText },
+  { id: 'assistant', label: 'Assistant', icon: MessageSquare },
 ];
 
 const AUDIT_ACTION_META = {
@@ -82,6 +84,12 @@ function AdminDashboard() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(true);
   const [auditError, setAuditError] = useState('');
+
+  // Chat Assistant
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState('');
 
   useEffect(() => {
   getAllReports()
@@ -162,6 +170,27 @@ function AdminDashboard() {
     }
   };
 
+
+  const handleSendChat = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim() || chatLoading) return;
+
+    const userQuery = chatInput;
+    setChatMessages((prev) => [...prev, { role: 'user', text: userQuery }]);
+    setChatInput('');
+    setChatError('');
+    setChatLoading(true);
+
+    try {
+      const data = await sendAdminChatQuery(userQuery);
+      setChatMessages((prev) => [...prev, { role: 'assistant', text: data.answer }]);
+    } catch (err) {
+      setChatError(err.message);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   const statusChartData = analytics?.statusCounts?.map((s) => ({
     name: STATUS_LABELS[s._id] || s._id,
     count: s.count,
@@ -187,20 +216,34 @@ function AdminDashboard() {
             Manage reports, departments, and track admin activity.
           </p>
 
-          <div className="flex gap-1 mt-8 overflow-x-auto">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-5 py-3 font-body text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-cyan text-cyan'
-                    : 'border-transparent text-text-muted hover:text-text-primary'
-                }`}
-              >
-                <tab.icon size={16} /> {tab.label}
-              </button>
-            ))}
+          <div className="flex gap-1 mt-8 overflow-x-auto items-center">
+            {TABS.map((tab) =>
+              tab.id === 'assistant' ? (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-4 py-2 ml-2 rounded-full font-body text-sm font-semibold whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-gradient-to-r from-cyan to-cyan-deep text-navy shadow-lg shadow-cyan/20'
+                      : 'bg-cyan-dim/40 text-cyan border border-cyan-dim hover:bg-cyan-dim'
+                  }`}
+                >
+                  <Sparkles size={14} /> {tab.label}
+                </button>
+              ) : (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-5 py-3 font-body text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-cyan text-cyan'
+                      : 'border-transparent text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  <tab.icon size={16} /> {tab.label}
+                </button>
+              )
+            )}
           </div>
         </div>
       </div>
@@ -547,6 +590,106 @@ function AdminDashboard() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ASSISTANT TAB */}
+        {activeTab === 'assistant' && (
+          <div className="max-w-3xl mx-auto">
+            <Card padding="none" className="overflow-hidden flex flex-col h-[600px]">
+              <div className="flex items-center gap-3 px-6 py-5 bg-navy relative overflow-hidden">
+                <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full border border-cyan-dim"></div>
+                <div className="w-10 h-10 rounded-xl bg-cyan-dim flex items-center justify-center text-cyan shrink-0 relative z-10">
+                  <Bot size={20} />
+                </div>
+                <div className="relative z-10">
+                  <p className="font-heading text-sm font-bold text-text-primary">Report Assistant</p>
+                  <p className="font-body text-xs text-text-muted">Ask anything about your civic reports</p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 bg-light">
+                {chatMessages.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-5 py-10">
+                    <div className="w-14 h-14 rounded-2xl bg-cyan-dim flex items-center justify-center text-cyan">
+                      <Bot size={26} />
+                    </div>
+                    <p className="font-body text-sm text-ink/50 text-center max-w-xs">
+                      Ask me about report counts, status breakdowns, SLA breaches, or anything else in your data.
+                    </p>
+                    <div className="flex flex-wrap gap-2 justify-center max-w-sm">
+                      {[
+                        'How many pending reports are there?',
+                        'Show me all resolved reports',
+                        'Which category has the most complaints?',
+                      ].map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          onClick={() => setChatInput(suggestion)}
+                          className="font-body text-xs text-cyan bg-cyan-dim/50 border border-cyan-dim rounded-full px-3 py-1.5 hover:bg-cyan-dim transition-colors"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  chatMessages.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex items-end gap-2 ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
+                    >
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                        msg.role === 'user' ? 'bg-navy text-cyan' : 'bg-cyan-dim text-cyan'
+                      }`}>
+                        {msg.role === 'user' ? <Users size={13} /> : <Bot size={13} />}
+                      </div>
+                      <div
+                        className={`max-w-[75%] px-4 py-2.5 font-body text-sm shadow-sm ${
+                          msg.role === 'user'
+                            ? 'bg-cyan text-navy rounded-2xl rounded-br-md'
+                            : 'bg-white text-ink rounded-2xl rounded-bl-md border border-hairline'
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {chatLoading && (
+                  <div className="flex items-end gap-2 self-start">
+                    <div className="w-7 h-7 rounded-full bg-cyan-dim text-cyan flex items-center justify-center shrink-0">
+                      <Bot size={13} />
+                    </div>
+                    <div className="bg-white border border-hairline rounded-2xl rounded-bl-md px-4 py-3 flex gap-1 items-center">
+                      <span className="w-1.5 h-1.5 bg-cyan rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                      <span className="w-1.5 h-1.5 bg-cyan rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                      <span className="w-1.5 h-1.5 bg-cyan rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {chatError && (
+                <div className="px-5 py-2 text-xs text-status-open border-t border-hairline bg-status-open-bg">
+                  {chatError}
+                </div>
+              )}
+
+              <form onSubmit={handleSendChat} className="flex items-center gap-2 p-4 border-t border-hairline bg-white">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Ask a question about your reports..."
+                  className="flex-1 border border-hairline rounded-full px-4 py-2.5 font-body text-sm text-ink outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/20 transition-all"
+                />
+                <Button type="submit" variant="primary" size="md" icon={Send} loading={chatLoading} className="!rounded-full !px-5">
+                  Send
+                </Button>
+              </form>
+            </Card>
           </div>
         )}
 
