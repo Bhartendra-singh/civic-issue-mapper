@@ -84,10 +84,24 @@ function AdminDashboard() {
   const [auditError, setAuditError] = useState('');
 
   useEffect(() => {
-    getAllReports()
-      .then((data) => setReports(data.reports))
-      .catch((err) => setReportsError(err.message))
-      .finally(() => setReportsLoading(false));
+  getAllReports()
+    .then((data) => {
+      const isActive = (r) => r.status === 'pending' || r.status === 'in-progress';
+
+      const sorted = [...data.reports].sort((a, b) => {
+        const aActive = isActive(a);
+        const bActive = isActive(b);
+
+        if (aActive && !bActive) return -1;
+        if (!aActive && bActive) return 1;
+
+        return (b.priorityScore ?? 0) - (a.priorityScore ?? 0);
+      });
+
+      setReports(sorted);
+    })
+    .catch((err) => setReportsError(err.message))
+    .finally(() => setReportsLoading(false));
 
     getAnalytics()
       .then((data) => setAnalytics(data))
@@ -295,6 +309,7 @@ function AdminDashboard() {
                       <th className="text-left px-4 py-3 text-ink/60 font-semibold">Cluster</th>
                       <th className="text-left px-4 py-3 text-ink/60 font-semibold">Description</th>
                       <th className="text-left px-4 py-3 text-ink/60 font-semibold">Reported By</th>
+                      <th className="text-left px-4 py-3 text-ink/60 font-semibold">Priority</th>
                       <th className="text-left px-4 py-3 text-ink/60 font-semibold">Status</th>
                     </tr>
                   </thead>
@@ -337,6 +352,19 @@ function AdminDashboard() {
                               </div>
                               <span className="text-ink">{reporterName}</span>
                             </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {report.status === 'pending' || report.status === 'in-progress' ? (
+                              <span className={`text-xs font-bold ${
+                                report.priorityScore >= 70 ? 'text-status-open' :
+                                report.priorityScore >= 40 ? 'text-status-progress' :
+                                'text-ink/40'
+                              }`}>
+                                {report.priorityScore ?? 0}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-ink/30">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <select

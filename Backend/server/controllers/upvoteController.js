@@ -1,5 +1,6 @@
 import Upvote from '../models/Upvote.js';
 import Report from '../models/Report.js';
+import { calculatePriorityScore } from '../utils/priorityScore.js';
 
 
 export const toggleUpvote = async (req, res) => {
@@ -12,14 +13,28 @@ export const toggleUpvote = async (req, res) => {
         if (existingUpvote) {
             await existingUpvote.deleteOne();
 
-            await Report.findByIdAndUpdate(reportId, { $inc: { upvoteCount: -1 } });
+            const report = await Report.findByIdAndUpdate(
+                reportId,
+                { $inc: { upvoteCount: -1 } },
+                { new: true }
+            );
+
+            report.priorityScore = calculatePriorityScore(report);
+            await report.save();
 
             return res.status(200).json({ message: 'Upvote removed', upvoted: false });
         }
 
         await Upvote.create({ user: userId, report: reportId });
 
-        await Report.findByIdAndUpdate(reportId, { $inc: { upvoteCount: 1 } });
+        const report = await Report.findByIdAndUpdate(
+            reportId,
+            { $inc: { upvoteCount: 1 } },
+            { new: true }
+        );
+
+        report.priorityScore = calculatePriorityScore(report);
+        await report.save();
 
         res.status(200).json({ message: 'Report upvoted', upvoted: true });
 

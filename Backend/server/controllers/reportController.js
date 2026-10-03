@@ -6,6 +6,7 @@ import { createAuditLog } from './auditLogController.js';
 import cloudinary from '../config/cloudinary.js';
 import redisClient from '../config/redis.js';
 import { clusterActiveReports } from '../services/clusteringService.js';
+import { calculatePriorityScore } from '../utils/priorityScore.js';
 
 
 export const createReport = async (req, res) => {
@@ -32,6 +33,9 @@ export const createReport = async (req, res) => {
             location: { lat, lng },
             department: department ? department._id : null,
         });
+
+        newReport.priorityScore = calculatePriorityScore(newReport);
+        await newReport.save();
 
         res.status(201).json({
             message: 'Report submitted successfully',
@@ -494,6 +498,30 @@ export const runClustering = async (req, res) => {
 };
 
 
+export const recalculateAllPriorityScores = async (req, res) => {
+    try {
+        const allReports = await Report.find();
+
+        let updatedCount = 0;
+
+        for (const report of allReports) {
+            report.priorityScore = calculatePriorityScore(report);
+            await report.save();
+            updatedCount++;
+        }
+
+        res.status(200).json({
+            message: 'Priority scores recalculated',
+            reportsUpdated: updatedCount,
+        });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+
 export const getReportsByCluster = async (req, res) => {
     try {
         const { clusterId } = req.params;
@@ -507,5 +535,4 @@ export const getReportsByCluster = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
-
 
