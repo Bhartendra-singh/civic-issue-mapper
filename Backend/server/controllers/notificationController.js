@@ -61,3 +61,14 @@ export const createStatusChangeNotification = async (userId, reportId, category,
         type: 'status-change',
     });
 };
+
+
+// Helper — reportController se call hoga jab SLA breach detect ho
+export const createSlaBreachNotification = async (adminId, reportId, category, departmentName) => {
+    await Notification.create({
+        user: adminId,
+        report: reportId,
+        message: `SLA breach: ${category} report (${departmentName}) is overdue`,
+        type: 'sla-breach',
+    });
+};

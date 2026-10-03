@@ -3,7 +3,7 @@ import {
 createReport, getMyReports, getAllReports, updateReportStatus,
 deleteReport, getAnalytics, getAllPublicReports, getPublicStats, 
 editReport, reopenReport, getAccountabilityMetrics, getReportById,
-runClustering, getReportsByCluster, recalculateAllPriorityScores, getCategorySuggestion
+runClustering, getReportsByCluster, recalculateAllPriorityScores, getCategorySuggestion, triggerSlaCheck
 } from '../controllers/reportController.js';
 
 import { protect, isAdmin, requireVerified } from '../middleware/authMiddleware.js';
@@ -21,6 +21,7 @@ router.get('/public', getAllPublicReports);
 router.get('/stats', getPublicStats);
 router.get('/accountability', getAccountabilityMetrics);
 router.post('/run-clustering', protect, isAdmin, runClustering);
+router.post('/check-sla', protect, isAdmin, triggerSlaCheck);
 router.post('/recalculate-priority', protect, isAdmin, recalculateAllPriorityScores);
 router.get('/cluster/:clusterId', getReportsByCluster);
 router.post('/suggest-category', getCategorySuggestion);

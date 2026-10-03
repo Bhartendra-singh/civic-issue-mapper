@@ -23,7 +23,7 @@ const notificationSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ['status-change'],
+            enum: ['status-change', 'sla-breach'],
             default: 'status-change',
         },
     },

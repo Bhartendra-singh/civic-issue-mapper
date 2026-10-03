@@ -16,6 +16,7 @@ import feedbackRoutes from './routes/feedbackRoutes.js';
 import compression from 'compression';
 import './config/redis.js'; 
 import { startClusteringCron } from './cron/clusteringCron.js';
+import { startSlaCron } from './cron/slaCron.js';
 
 
 dotenv.config();    //call this function and it will findout .env file and read it 
@@ -67,6 +68,8 @@ mongoose.connect(process.env.MONGODB_URI)
 
 
 startClusteringCron();
+startSlaCron();
+
 
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);

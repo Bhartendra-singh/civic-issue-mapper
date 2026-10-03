@@ -81,6 +81,11 @@ const reportSchema = new mongoose.Schema(
             default: null,
         }, 
 
+        slaBreachNotified: {
+            type: Boolean,
+            default: false,
+        },
+
         resolvedAt: {
             type: Date,
             default: null,

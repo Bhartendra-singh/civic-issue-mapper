@@ -1,6 +1,6 @@
 import Report from '../models/Report.js';
 import User from '../models/User.js';
-import { createStatusChangeNotification } from './notificationController.js';
+import { createStatusChangeNotification, createSlaBreachNotification } from './notificationController.js';
 import { getDepartmentByCategory } from './departmentController.js';
 import { createAuditLog } from './auditLogController.js';
 import cloudinary from '../config/cloudinary.js';
@@ -552,6 +552,57 @@ export const getCategorySuggestion = async (req, res) => {
         res.status(200).json(suggestion || { category: null, confidence: 0 });
 
     } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+
+export const checkSlaBreaches = async () => {
+    const activeReports = await Report.find({
+        status: { $in: ['pending', 'in-progress'] },
+        slaBreachNotified: { $ne: true },
+    }).populate('department', 'slaHours name');
+
+    const admins = await User.find({ role: 'admin' });
+
+    let notifiedCount = 0;
+
+    for (const report of activeReports) {
+        if (!report.department) continue;
+
+        const slaMs = report.department.slaHours * 60 * 60 * 1000;
+        const ageMs = Date.now() - report.createdAt.getTime();
+
+        if (ageMs > slaMs) {
+            for (const admin of admins) {
+                await createSlaBreachNotification(
+                    admin._id,
+                    report._id,
+                    report.category,
+                    report.department.name
+                );
+            }
+
+            report.slaBreachNotified = true;
+            await report.save();
+            notifiedCount++;
+        }
+    }
+
+    return { totalChecked: activeReports.length, notified: notifiedCount };
+};
+
+
+
+export const triggerSlaCheck = async (req, res) => {
+    try {
+        const result = await checkSlaBreaches();
+        res.status(200).json({
+            message: 'SLA check completed',
+            ...result,
+        });
+    } catch (error) {
+        console.log(error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
