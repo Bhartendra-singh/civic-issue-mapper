@@ -7,6 +7,7 @@ import {
   getMyNotifications, markNotificationRead, markAllNotificationsRead,
 } from '../../services/api';
 import { timeAgo } from '../../utils/timeAgo';
+import { connectSocket, disconnectSocket } from '../../services/socket';
 import Button, { getButtonClasses } from '../ui/Button';
 import ChatWidget from './ChatWidget';
 
@@ -138,6 +139,28 @@ function Navbar() {
       .catch((err) => console.error('Failed to load notifications', err));
   }, [user]);
 
+  useEffect(() => {
+  if (!user) {
+    disconnectSocket();
+    return;
+  }
+
+  const socket = connectSocket();
+
+  const handleNewNotification = (notification) => {
+    setNotifications((prev) => {
+      if (prev.some((n) => n._id === notification._id)) return prev;
+      return [notification, ...prev];
+    });
+  };
+
+  socket.on('notification', handleNewNotification);
+
+  return () => {
+    socket.off('notification', handleNewNotification);
+  };
+}, [user]);
+
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const handleMarkRead = async (id) => {
@@ -169,10 +192,12 @@ function Navbar() {
 
   const navLinks = [
     { to: '/', label: 'Home', show: true },
+    { to: '/about', label: 'About', show: true },
     { to: '/map', label: 'Map', show: true },
     { to: '/my-reports', label: 'My Reports', show: !!user },
     { to: '/submit-report', label: 'Report Issue', show: !!user },
     { to: '/admin/dashboard', label: 'Dashboard', show: user?.role === 'admin' },
+    { to: '/contact', label: 'Contact', show: true },
   ];
 
   return (
@@ -329,7 +354,7 @@ function Navbar() {
           )}
         </AnimatePresence>
       </nav>
-      {user && <ChatWidget />}
+      {user && user.role !== 'admin' && <ChatWidget />}
     </>
     );
   }

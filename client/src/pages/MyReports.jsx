@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Inbox, Loader2, AlertTriangle, Plus, ClipboardList } from 'lucide-react';
+import { Inbox, Loader2, AlertTriangle, Plus } from 'lucide-react';
 import { getMyReports, getMyUpvotedReportIds } from '../services/api';
+import { connectSocket } from '../services/socket';
 import Button from '../components/ui/Button';
 import ReportCard from '../components/report/ReportCard';
 
@@ -30,8 +31,32 @@ function MyReports() {
     fetchReports();
 
     getMyUpvotedReportIds()
-        .then((data) => setUpvotedIds(new Set(data.reportIds)))
-        .catch(() => setUpvotedIds(new Set()));
+      .then((data) => setUpvotedIds(new Set(data.reportIds)))
+      .catch(() => setUpvotedIds(new Set()));
+  }, []);
+
+  useEffect(() => {
+    const socket = connectSocket();
+
+    const handleReportUpdated = ({ _id, status, clusterId, resolvedAt, hasBeenReopened }) => {
+      setReports((prev) =>
+        prev.map((r) =>
+          r._id === _id ? { ...r, status, clusterId, resolvedAt, hasBeenReopened } : r
+        )
+      );
+    };
+
+    const handleReportDeleted = ({ _id }) => {
+      setReports((prev) => prev.filter((r) => r._id !== _id));
+    };
+
+    socket.on('report:updated', handleReportUpdated);
+    socket.on('report:deleted', handleReportDeleted);
+
+    return () => {
+      socket.off('report:updated', handleReportUpdated);
+      socket.off('report:deleted', handleReportDeleted);
+    };
   }, []);
 
   const handleReportUpdate = (updatedReport) => {

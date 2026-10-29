@@ -18,9 +18,12 @@ import './config/redis.js';
 import { startClusteringCron } from './cron/clusteringCron.js';
 import { startSlaCron } from './cron/slaCron.js';
 import chatRoutes from './routes/chatRoutes.js';
+import http from 'http';
+import { initSocket } from './config/socket.js';
+import contactRoutes from './routes/contactRoutes.js';
 
 
-dotenv.config();    //call this function and it will findout .env file and read it 
+dotenv.config(); 
 
 
 function sanitizeObject(obj) {
@@ -35,13 +38,13 @@ function sanitizeObject(obj) {
   }
 }
 
-const app = express();  //call the express function and it return a object that we store in app variable
+const app = express();  
 
 
 //Middlewares 
-//app.use(cors());        // this function use to attach middleware(each request jo server tk aaye wo phle ye function chalao)
+
 app.use(cors({ 
-  origin: 'http://localhost:5173',
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
 }));
 
@@ -81,6 +84,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/contact', contactRoutes);
 
 
 app.get('/', (req, res) => {
@@ -102,8 +106,14 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+// app.listen(PORT, () => {
+//     console.log(`Server running on port ${PORT}`);
+// });
+
+const httpServer = http.createServer(app);
+initSocket(httpServer);
+
+httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
-
 
