@@ -16,6 +16,8 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ReportDetail from './pages/ReportDetail';
 import Profile from './pages/Profile';
+import Contact from './pages/Contact';
+import About from './pages/About';
 
 
 function App() {
@@ -61,6 +63,8 @@ function App() {
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/reports/:id" element={<ReportDetail />} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/about" element={<About />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

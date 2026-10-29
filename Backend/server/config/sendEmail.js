@@ -39,3 +39,30 @@ export const sendPasswordResetEmail = async (toEmail, resetLink) => {
         `,
     });
 };
+
+
+const escapeHtml = (text) =>
+    String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+
+export const sendContactNotificationEmail = async ({ name, email, subject, message }) => {
+    await transporter.sendMail({
+        from: `"Civic Issue Mapper" <${process.env.EMAIL_USER}>`,
+        to: process.env.EMAIL_USER,
+        replyTo: email,
+        subject: `[Contact] ${subject}`,
+        html: `
+            <h2>New contact message</h2>
+            <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+            <p><strong>Email:</strong> ${escapeHtml(email)}</p>
+            <p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
+            <p><strong>Message:</strong></p>
+            <p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>
+        `,
+    });
+};
