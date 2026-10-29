@@ -22,20 +22,6 @@ export function AuthProvider({ children }) {
         checkAuth();
     }, []);
 
-    // useEffect(() => {
-    //     const checkAuth = async () => {
-    //         try {
-    //             const data = await getProfile();
-    //             setUser(data.user);
-    //         } catch (error) {
-    //             setUser(null);
-    //         } finally {
-    //             setLoading(false);
-    //         }
-    //     };
-
-    //     checkAuth();
-    // }, []);
 
     const login = (userData) => {
         setUser(userData);
