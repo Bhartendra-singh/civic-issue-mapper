@@ -1,4 +1,5 @@
 import Comment from '../models/Comment.js';
+import { getIO } from '../config/socket.js';
 
 
 export const addComment = async (req, res) => {
@@ -7,7 +8,7 @@ export const addComment = async (req, res) => {
         const reportId = req.params.reportId;
 
         if (!text || text.trim() === '') {
-            return res.status(400).json({ messaage: 'Comment text is required' });
+            return res.status(400).json({ message: 'Comment text is required' });
         }
 
         const comment = await Comment.create({
@@ -17,6 +18,11 @@ export const addComment = async (req, res) => {
         });
 
         const populatedComment = await comment.populate('user', 'name');
+
+        const io = getIO();
+        if (io) {
+            io.to(`report:${reportId}`).emit('comment:new', populatedComment.toObject());
+        }
 
         res.status(201).json({ message: 'Comment added', comment: populatedComment });
 
@@ -59,7 +65,15 @@ export const deleteComment = async (req, res) => {
             return res.status(403).json({ message: 'You can only delete your own comments' });
         }
 
+        const reportId = comment.report.toString();
+        const commentId = comment._id.toString();
+
         await comment.deleteOne();
+
+        const io = getIO();
+        if (io) {
+            io.to(`report:${reportId}`).emit('comment:deleted', { commentId });
+        }
 
         res.status(200).json({ message: 'Comment deleted successfully' });
 

@@ -2,7 +2,7 @@ const API_URL = 'http://localhost:5000/api';
 
 let refreshPromise = null;
 
-async function tryRefreshToken() {
+export async function tryRefreshToken() {
   if (!refreshPromise) {
     refreshPromise = fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
@@ -223,6 +223,36 @@ export const reopenReport = async (reportId) => {
   return data;
 };
 
+
+export const editReport = async (reportId, formData) => {
+  const response = await request(`${API_URL}/reports/${reportId}`, {
+    method: 'PATCH',
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update report');
+  }
+
+  return data;
+};
+
+export const deleteReport = async (reportId) => {
+  const response = await request(`${API_URL}/reports/${reportId}`, {
+    method: 'DELETE',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to delete report');
+  }
+
+  return data;
+};
+
 export const getComments = async (reportId) => {
   const response = await fetch(`${API_URL}/comments/${reportId}`);
 
@@ -248,17 +278,33 @@ export const getDepartments = async () => {
   return data;
 };
 
-export const createDepartment = async (name, description, categories) => {
+export const createDepartment = async (name, description, categories, slaHours) => {
   const response = await request(`${API_URL}/departments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, description, categories }),
+    body: JSON.stringify({ name, description, categories, slaHours }),
   });
 
   const data = await response.json();
 
   if (!response.ok) {
     throw new Error(data.message || 'Failed to create department');
+  }
+
+  return data;
+};
+
+export const updateDepartment = async (departmentId, { name, description, categories, slaHours }) => {
+  const response = await request(`${API_URL}/departments/${departmentId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description, categories, slaHours }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update department');
   }
 
   return data;
@@ -331,7 +377,9 @@ export const markAllNotificationsRead = async () => {
 
 
 export const getReportById = async (reportId) => {
-  const response = await fetch(`${API_URL}/reports/${reportId}`);
+  const response = await fetch(`${API_URL}/reports/${reportId}`, {
+    credentials: 'include',
+  });
   const data = await response.json();
 
   if (!response.ok) {
@@ -480,6 +528,23 @@ export const sendUserChatQuery = async (query) => {
 
   if (!response.ok) {
     throw new Error(data.message || 'Failed to get response');
+  }
+
+  return data;
+};
+
+
+export const sendContactMessage = async ({ name, email, subject, message }) => {
+  const response = await fetch(`${API_URL}/contact`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, subject, message }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to send message');
   }
 
   return data;

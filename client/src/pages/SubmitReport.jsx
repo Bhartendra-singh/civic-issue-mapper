@@ -6,6 +6,8 @@ import { createReport, suggestCategory } from '../services/api';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 
+const MAX_PHOTOS = 4;
+
 
 function SubmitReport() {
     const routerLocation = useLocation();
@@ -14,7 +16,7 @@ function SubmitReport() {
     const [category, setCategory] = useState(prefill.category || 'pothole');
     const [description, setDescription] = useState(prefill.description || '');
     const [suggestion, setSuggestion] = useState(null);
-    const [photo, setPhoto] = useState(null);
+    const [photos, setPhotos] = useState([]);
     const [location, setLocation] = useState({ lat: null, lng: null });
     const [locationStatus, setLocationStatus] = useState('idle');
     const [error, setError] = useState('');
@@ -46,38 +48,60 @@ function SubmitReport() {
     };
 
     const handlePhotoChange = (e) => {
-        setPhoto(e.target.files[0]);
+        const picked = Array.from(e.target.files);
+        const combined = [...photos];
+
+        for (const file of picked) {
+            const isDuplicate = combined.some(
+                (f) => f.name === file.name && f.size === file.size
+            );
+            if (!isDuplicate) combined.push(file);
+        }
+
+        if (combined.length > MAX_PHOTOS) {
+            setError(`You can upload a maximum of ${MAX_PHOTOS} photos`);
+        } else {
+            setError('');
+        }
+
+        setPhotos(combined.slice(0, MAX_PHOTOS));
+        e.target.value = '';
+    };
+
+    const removePhoto = (index) => {
+        setPhotos((prev) => prev.filter((_, i) => i !== index));
+        setError('');
     };
 
 
     useEffect(() => {
-  if (description.trim().length < 5) {
-    setSuggestion(null);
-    return;
-  }
-
-  const timer = setTimeout(() => {
-    suggestCategory(description)
-      .then((data) => {
-        if (data.category && data.category !== category) {
-          setSuggestion(data);
-        } else {
-          setSuggestion(null);
+        if (description.trim().length < 5) {
+            setSuggestion(null);
+            return;
         }
-      })
-      .catch(() => setSuggestion(null));
-  }, 600);
 
-  return () => clearTimeout(timer);
-}, [description]);
+        const timer = setTimeout(() => {
+            suggestCategory(description)
+                .then((data) => {
+                    if (data.category && data.category !== category) {
+                        setSuggestion(data);
+                    } else {
+                        setSuggestion(null);
+                    }
+                })
+                .catch(() => setSuggestion(null));
+        }, 600);
+
+        return () => clearTimeout(timer);
+    }, [description]);
 
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
-        if (!photo) {
-            setError('Please select a photo');
+        if (photos.length === 0) {
+            setError('Please select at least one photo');
             return;
         }
 
@@ -89,7 +113,7 @@ function SubmitReport() {
         setLoading(true);
 
         const formDataObj = new FormData();
-        formDataObj.append('photo', photo);
+        photos.forEach((file) => formDataObj.append('photo', file));
         formDataObj.append('category', category);
         formDataObj.append('description', description);
         formDataObj.append('lat', location.lat);
@@ -216,7 +240,7 @@ function SubmitReport() {
                 </div>
             </div>
 
-                       {/* ── Right Panel — Form ── */}
+            {/* ── Right Panel — Form ── */}
             <div className="bg-light flex items-center justify-center px-6 py-14 relative overflow-hidden">
 
                 {/* Soft color blobs — ties the light panel back to the brand palette */}
@@ -266,81 +290,111 @@ function SubmitReport() {
                             </div>
                         )}
 
-                    <div className="mt-6">
-                        <Input
-                            id="description"
-                            label="Description"
-                            icon={FileText}
-                            type="textarea"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Briefly describe the issue..."
-                            maxLength={500}
-                            rows={3}
-                            required
-                        />
-                        <p className="font-body text-xs text-ink/40 text-right mt-1">
-                            {description.length}/500
-                        </p>
+                        <div className="mt-6">
+                            <Input
+                                id="description"
+                                label="Description"
+                                icon={FileText}
+                                type="textarea"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="Briefly describe the issue..."
+                                maxLength={500}
+                                rows={3}
+                                required
+                            />
+                            <p className="font-body text-xs text-ink/40 text-right mt-1">
+                                {description.length}/500
+                            </p>
 
-                        {suggestion && (
-                            <div className="flex items-center justify-between gap-3 bg-cyan-dim/30 border border-cyan-dim rounded-lg px-4 py-2.5 mt-2">
-                                <p className="font-body text-xs text-ink">
-                                    Did you mean <span className="font-semibold text-cyan capitalize">{suggestion.category}</span>?
-                                </p>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setCategory(suggestion.category);
-                                        setSuggestion(null);
-                                    }}
-                                    className="font-body text-xs font-semibold text-cyan hover:underline shrink-0"
-                                >
-                                    Use this
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="mt-5">
-                        <label className="flex items-center gap-1.5 font-body text-sm font-semibold text-ink mb-2">
-                            <Tag size={15} className="text-cyan" /> Category
-                        </label>
-                        <select
-                            value={category}
-                            onChange={(e) => setCategory(e.target.value)}
-                            className="w-full border border-hairline rounded-lg px-4 py-3 font-body text-ink outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/20 transition-all"
-                        >
-                            <option value="pothole">Pothole</option>
-                            <option value="garbage">Garbage</option>
-                            <option value="waterlogging">Waterlogging</option>
-                            <option value="streetlight">Streetlight</option>
-                            <option value="drain">Drain</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
+                            {suggestion && (
+                                <div className="flex items-center justify-between gap-3 bg-cyan-dim/30 border border-cyan-dim rounded-lg px-4 py-2.5 mt-2">
+                                    <p className="font-body text-xs text-ink">
+                                        Did you mean <span className="font-semibold text-cyan capitalize">{suggestion.category}</span>?
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCategory(suggestion.category);
+                                            setSuggestion(null);
+                                        }}
+                                        className="font-body text-xs font-semibold text-cyan hover:underline shrink-0"
+                                    >
+                                        Use this
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         <div className="mt-5">
                             <label className="flex items-center gap-1.5 font-body text-sm font-semibold text-ink mb-2">
-                                <Camera size={15} className="text-cyan" /> Photo
+                                <Tag size={15} className="text-cyan" /> Category
                             </label>
-                            <label className="flex items-center gap-3 border border-dashed border-hairline rounded-lg px-4 py-4 cursor-pointer hover:border-cyan hover:bg-cyan-dim/20 transition-colors">
-                                <span className="bg-cyan-dim text-cyan rounded-lg p-2">
-                                    <Camera size={18} />
-                                </span>
-                                <div>
-                                    <span className="font-body text-sm text-cyan font-semibold">
-                                        {photo ? photo.name : 'Choose File'}
+                            <select
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                className="w-full border border-hairline rounded-lg px-4 py-3 font-body text-ink outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/20 transition-all"
+                            >
+                                <option value="pothole">Pothole</option>
+                                <option value="garbage">Garbage</option>
+                                <option value="waterlogging">Waterlogging</option>
+                                <option value="streetlight">Streetlight</option>
+                                <option value="drain">Drain</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div className="mt-5">
+                            <label className="flex items-center gap-1.5 font-body text-sm font-semibold text-ink mb-2">
+                                <Camera size={15} className="text-cyan" /> Photos
+                                <span className="font-normal text-ink/50">({photos.length}/{MAX_PHOTOS})</span>
+                            </label>
+
+                            {photos.length < MAX_PHOTOS && (
+                                <label className="flex items-center gap-3 border border-dashed border-hairline rounded-lg px-4 py-4 cursor-pointer hover:border-cyan hover:bg-cyan-dim/20 transition-colors">
+                                    <span className="bg-cyan-dim text-cyan rounded-lg p-2">
+                                        <Camera size={18} />
                                     </span>
-                                    <p className="font-body text-xs text-ink/50">JPG, PNG (Max 5MB)</p>
+                                    <div>
+                                        <span className="font-body text-sm text-cyan font-semibold">
+                                            {photos.length === 0 ? 'Choose Files' : 'Add more photos'}
+                                        </span>
+                                        <p className="font-body text-xs text-ink/50">JPG, PNG, up to {MAX_PHOTOS} photos</p>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        accept="image/jpeg,image/png"
+                                        multiple
+                                        onChange={handlePhotoChange}
+                                        className="hidden"
+                                    />
+                                </label>
+                            )}
+
+                            {photos.length > 0 && (
+                                <div className="grid grid-cols-4 gap-2 mt-3">
+                                    {photos.map((file, i) => (
+                                        <div
+                                            key={`${file.name}-${file.size}`}
+                                            className="relative aspect-square rounded-lg overflow-hidden border border-hairline"
+                                        >
+                                            <img
+                                                src={URL.createObjectURL(file)}
+                                                alt={file.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removePhoto(i)}
+                                                aria-label="Remove photo"
+                                                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-navy/80 text-white text-xs flex items-center justify-center hover:bg-status-open"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handlePhotoChange}
-                                    className="hidden"
-                                />
-                            </label>
+                            )}
                         </div>
 
                         <div className="mt-5">
@@ -379,7 +433,7 @@ function SubmitReport() {
                     </div>
                 </form>
             </div>
-        </div>   
+        </div>
     );
 }
 

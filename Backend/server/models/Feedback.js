@@ -22,7 +22,7 @@ const feedbackSchema = new mongoose.Schema(
             max: 5,
         },
 
-        Comment: {
+        comment: {
             type: String,
             trim: true,
             maxlength: 300,

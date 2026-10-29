@@ -1,6 +1,18 @@
 import Upvote from '../models/Upvote.js';
 import Report from '../models/Report.js';
 import { calculatePriorityScore } from '../utils/priorityScore.js';
+import { getIO } from '../config/socket.js';
+
+
+const emitUpvoteCount = (reportId, upvoteCount) => {
+    const io = getIO();
+    if (io) {
+        io.to(`report:${reportId}`).emit('report:upvoted', {
+            reportId: String(reportId),
+            upvoteCount,
+        });
+    }
+};
 
 
 export const toggleUpvote = async (req, res) => {
@@ -16,11 +28,13 @@ export const toggleUpvote = async (req, res) => {
             const report = await Report.findByIdAndUpdate(
                 reportId,
                 { $inc: { upvoteCount: -1 } },
-                { new: true }
+                { returnDocument: 'after' }
             );
 
             report.priorityScore = calculatePriorityScore(report);
             await report.save();
+
+            emitUpvoteCount(reportId, report.upvoteCount);
 
             return res.status(200).json({ message: 'Upvote removed', upvoted: false });
         }
@@ -30,11 +44,13 @@ export const toggleUpvote = async (req, res) => {
         const report = await Report.findByIdAndUpdate(
             reportId,
             { $inc: { upvoteCount: 1 } },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         report.priorityScore = calculatePriorityScore(report);
         await report.save();
+
+        emitUpvoteCount(reportId, report.upvoteCount);
 
         res.status(200).json({ message: 'Report upvoted', upvoted: true });
 

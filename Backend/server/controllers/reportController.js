@@ -1,13 +1,43 @@
 import Report from '../models/Report.js';
 import User from '../models/User.js';
-import { createStatusChangeNotification, createSlaBreachNotification } from './notificationController.js';
+import Upvote from '../models/Upvote.js';
+import Comment from '../models/Comment.js';
+import Feedback from '../models/Feedback.js';
+import Notification from '../models/Notification.js';
+import { createStatusChangeNotification, createSlaBreachNotification, createReopenNotification } from './notificationController.js';
 import { getDepartmentByCategory } from './departmentController.js';
 import { createAuditLog } from './auditLogController.js';
 import cloudinary from '../config/cloudinary.js';
 import redisClient from '../config/redis.js';
 import { clusterActiveReports, suggestCategory } from '../services/clusteringService.js';
 import { calculatePriorityScore } from '../utils/priorityScore.js';
+import { getIO } from '../config/socket.js';
 
+
+const ACTIVE_STATUSES = ['pending', 'in-progress', 'reopened'];
+
+
+// SLA ka clock: reopen hui report ke liye reopen ke waqt se, baaki ke liye createdAt se
+const getSlaStart = (report) =>
+    report.reopenedAt || (report.status === 'reopened' ? report.updatedAt : report.createdAt);
+
+
+const emitReportUpdate = (report) => {
+    const io = getIO();
+    if (!io) return;
+
+    io.to('admins')
+        .to(`user:${report.user}`)
+        .to(`report:${report._id}`)
+        .emit('report:updated', {
+            _id: report._id,
+            status: report.status,
+            clusterId: report.clusterId,
+            resolvedAt: report.resolvedAt,
+            hasBeenReopened: report.hasBeenReopened,
+            priorityScore: report.priorityScore,
+        });
+};
 
 
 export const createReport = async (req, res) => {
@@ -37,6 +67,14 @@ export const createReport = async (req, res) => {
 
         newReport.priorityScore = calculatePriorityScore(newReport);
         await newReport.save();
+
+        const io = getIO();
+        if (io) {
+            io.to('admins').emit('report:new', {
+                ...newReport.toObject(),
+                user: { _id: req.user.id, name: req.user.name, email: req.user.email },
+            });
+        }
 
         res.status(201).json({
             message: 'Report submitted successfully',
@@ -89,13 +127,22 @@ export const updateReportStatus = async (req, res) => {
             report.resolvedAt = new Date();
         }
 
-        if (status !== 'pending' && status !== 'in-progress') {
+        if (status === 'reopened') {
+            report.reopenedAt = new Date();
+            report.slaBreachNotified = false;
+        }
+
+        if (!ACTIVE_STATUSES.includes(status)) {
             report.clusterId = null;
         }
+
+        report.priorityScore = calculatePriorityScore(report);
 
         await report.save();
 
         await createStatusChangeNotification(report.user, report._id, report.category, report.status);
+
+        emitReportUpdate(report);
 
         await createAuditLog(
             req.user.id,
@@ -129,22 +176,52 @@ export const deleteReport = async (req, res) => {
             return res.status(403).json({ message: 'You can only delete your own reports' });
         }
 
-        const reportId = report._id;
+        if (!isAdminUser && report.status !== 'pending') {
+            return res.status(400).json({
+                message: 'You can only delete a report while it is pending',
+            });
+        }
+
+        const reportId = String(report._id);
+        const reportOwnerId = report.user;
         const reportCategory = report.category;
+        const photoIds = (report.photoUrls || []).map((photo) => photo.publicId);
+
+        await Promise.all([
+            Upvote.deleteMany({ report: reportId }),
+            Comment.deleteMany({ report: reportId }),
+            Feedback.deleteMany({ report: reportId }),
+            Notification.deleteMany({ report: reportId }),
+        ]);
 
         await report.deleteOne();
+
+        await Promise.all(
+            photoIds.map((publicId) => cloudinary.uploader.destroy(publicId).catch(() => {}))
+        );
 
         await createAuditLog(
             req.user.id,
             'delete-report',
             'Report',
             reportId,
-            `Deleted ${reportCategory} report`
+            `Deleted ${reportCategory} report${isAdminUser && !isOwner ? ' (by admin)' : ''}`
         );
+
+        await redisClient.del('public-stats', 'admin-analytics', 'accountability-metrics');
+
+        const io = getIO();
+        if (io) {
+            io.to('admins')
+                .to(`user:${reportOwnerId}`)
+                .to(`report:${reportId}`)
+                .emit('report:deleted', { _id: reportId });
+        }
 
         res.status(200).json({ message: 'Report deleted successfully' });
 
     } catch (error) {
+        console.log(error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
@@ -193,7 +270,7 @@ export const getAnalytics = async (req, res) => {
 
 export const getAllPublicReports = async (req, res) => {
     try {
-        const reports = await Report.find().select('category description location status createdAt');
+        const reports = await Report.find().select('category description location status createdAt upvoteCount');
         res.status(200).json({ reports });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
@@ -230,68 +307,95 @@ export const getPublicStats = async (req, res) => {
 };
 
 
+const destroyUploads = async (files = []) => {
+    await Promise.all(
+        files.map((file) => cloudinary.uploader.destroy(file.filename).catch(() => {}))
+    );
+};
+
+
 export const editReport = async (req, res) => {
+    const newFiles = req.files || [];
+
     try {
         const { description, removePhotoIds } = req.body;
 
         const report = await Report.findById(req.params.id);
 
         if (!report) {
-            return res.status(400).json({ message: 'Report not found' });
+            await destroyUploads(newFiles);
+            return res.status(404).json({ message: 'Report not found' });
         }
 
-        const isOwner = report.user.toString() === req.user.id;
-
-        if (!isOwner) {
+        if (report.user.toString() !== req.user.id) {
+            await destroyUploads(newFiles);
             return res.status(403).json({ message: 'You can only edit your own reports' });
         }
 
         if (report.status !== 'pending') {
+            await destroyUploads(newFiles);
             return res.status(400).json({ message: 'Report can only be edited while it is pending' });
         }
 
-        if (description) {
-            report.description = description;
-        }
+        if (description !== undefined) {
+            const trimmed = description.trim();
 
-        const idsToRemove = removePhotoIds ? removePhotoIds.split(',') : [] ;
-
-        if (idsToRemove.length > 0) {
-            for (const publicId of idsToRemove) {
-                await cloudinary.uploader.destroy(publicId);
+            if (!trimmed) {
+                await destroyUploads(newFiles);
+                return res.status(400).json({ message: 'Description cannot be empty' });
             }
 
-            report.photoUrls = report.photoUrls.filter(
-                (photo) => !idsToRemove.includes(photo.publicId)
-            );
+            if (trimmed.length > 500) {
+                await destroyUploads(newFiles);
+                return res.status(400).json({ message: 'Description cannot exceed 500 characters' });
+            }
+
+            report.description = trimmed;
         }
 
-        if(req.files && req.files.length > 0) {
-            const newPhotos = req.files.map((file) => ({
-                url: file.path,
-                publicId: file.filename,
-            }));
+        const requestedIds = removePhotoIds
+            ? removePhotoIds.split(',').map((id) => id.trim()).filter(Boolean)
+            : [];
 
-            report.photoUrls = [...report.photoUrls, ...newPhotos];
-        }
+        const idsToRemove = requestedIds.filter((id) =>
+            report.photoUrls.some((photo) => photo.publicId === id)
+        );
 
-        if (report.photoUrls.length > 4) {
-            return res.status(400).json({ message: 'A report can have a maximum of 4 photos' });
-        }
+        const keptPhotos = report.photoUrls.filter(
+            (photo) => !idsToRemove.includes(photo.publicId)
+        );
 
-        if (report.photoUrls.length === 0) {
+        const addedPhotos = newFiles.map((file) => ({
+            url: file.path,
+            publicId: file.filename,
+        }));
+
+        const finalPhotos = [...keptPhotos, ...addedPhotos];
+
+        if (finalPhotos.length < 1) {
+            await destroyUploads(newFiles);
             return res.status(400).json({ message: 'A report must have at least 1 photo' });
         }
 
+        if (finalPhotos.length > 4) {
+            await destroyUploads(newFiles);
+            return res.status(400).json({ message: 'A report can have a maximum of 4 photos' });
+        }
+
+        report.photoUrls = finalPhotos;
         await report.save();
 
+        await Promise.all(
+            idsToRemove.map((publicId) => cloudinary.uploader.destroy(publicId).catch(() => {}))
+        );
+
         res.status(200).json({ message: 'Report updated successfully', report });
-    
+
     } catch (error) {
         console.log(error);
+        await destroyUploads(newFiles);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
-
 };
 
 
@@ -327,6 +431,9 @@ export const reopenReport = async (req, res) => {
         report.status = 'reopened';
         report.hasBeenReopened = true;
         report.resolvedAt = null;
+        report.reopenedAt = new Date();
+        report.slaBreachNotified = false;
+        report.priorityScore = calculatePriorityScore(report);
 
         await report.save();
 
@@ -337,6 +444,20 @@ export const reopenReport = async (req, res) => {
             report._id,
             `Report reopened by citizen: ${report.category}`
         );
+
+        try {
+            const admins = await User.find({ role: 'admin' }).select('_id');
+
+            await Promise.all(
+                admins.map((admin) =>
+                    createReopenNotification(admin._id, report._id, report.category)
+                )
+            );
+        } catch (notifyError) {
+            console.log('Reopen notification failed:', notifyError.message);
+        }
+
+        emitReportUpdate(report);
 
         res.status(200).json({ message: 'Report reopened successfully', report });
 
@@ -373,7 +494,7 @@ export const getAccountabilityMetrics = async (req, res) => {
             : 0;
 
         const activeReports = await Report.find({
-            status: { $in: ['pending', 'in-progress'] }
+            status: { $in: ACTIVE_STATUSES }
         }).populate('department', 'slaHours');
 
         let breachedCount = 0;
@@ -382,7 +503,7 @@ export const getAccountabilityMetrics = async (req, res) => {
             if (!report.department) continue;
 
             const slaMs = report.department.slaHours * 60 * 60 * 1000;
-            const ageMs = Date.now() - report.createdAt.getTime();
+            const ageMs = Date.now() - getSlaStart(report).getTime();
 
             if (ageMs > slaMs) {
                 breachedCount++;
@@ -443,13 +564,19 @@ export const getAccountabilityMetrics = async (req, res) => {
 export const getReportById = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id)
-      .populate('department', 'name slaHours');
+      .select('user category description location status createdAt photoUrls upvoteCount department hasBeenReopened resolvedAt clusterId')
+      .populate('department', 'name')
+      .lean();
 
     if (!report) {
       return res.status(404).json({ message: 'Report not found' });
     }
 
-    res.status(200).json({ report });
+    const isOwner = !!req.user && String(report.user) === String(req.user.id);
+
+    const { user, ...publicReport } = report;
+
+    res.status(200).json({ report: { ...publicReport, isOwner } });
 
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -459,7 +586,7 @@ export const getReportById = async (req, res) => {
 
 export const performClustering = async () => {
     const activeReports = await Report.find({
-        status: { $in: ['pending', 'in-progress'] }
+        status: { $in: ACTIVE_STATUSES }
     });
 
     const clusterMap = await clusterActiveReports(activeReports);
@@ -559,7 +686,7 @@ export const getCategorySuggestion = async (req, res) => {
 
 export const checkSlaBreaches = async () => {
     const activeReports = await Report.find({
-        status: { $in: ['pending', 'in-progress'] },
+        status: { $in: ACTIVE_STATUSES },
         slaBreachNotified: { $ne: true },
     }).populate('department', 'slaHours name');
 
@@ -571,7 +698,7 @@ export const checkSlaBreaches = async () => {
         if (!report.department) continue;
 
         const slaMs = report.department.slaHours * 60 * 60 * 1000;
-        const ageMs = Date.now() - report.createdAt.getTime();
+        const ageMs = Date.now() - getSlaStart(report).getTime();
 
         if (ageMs > slaMs) {
             for (const admin of admins) {
