@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -6,17 +7,19 @@ import {
   LayoutDashboard, ClipboardList, Building2, ScrollText,
   Loader2, AlertTriangle, Plus, Image as ImageIcon,
   RefreshCw, Trash2, FolderPlus, Users, Clock, CheckCircle2, Link2,
-  MessageSquare, Send, Bot, Sparkles,
+  MessageSquare, Send, Bot, Sparkles, Pencil, Save, X,
 } from 'lucide-react';
 import {
-  getAllReports, updateReportStatus, getAnalytics,
-  getDepartments, createDepartment, getAuditLogs, sendAdminChatQuery,
+  getAllReports, updateReportStatus, deleteReport, getAnalytics,
+  getDepartments, createDepartment, updateDepartment, getAuditLogs, sendAdminChatQuery,
 } from '../../services/api';
+import { connectSocket } from '../../services/socket';
 import { timeAgo } from '../../utils/timeAgo';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Card from '../../components/ui/Card';
+import ReportDrawer from '../../components/admin/ReportDrawer';
 
 const CATEGORY_LABELS = {
   pothole: 'Pothole',
@@ -48,6 +51,7 @@ const AUDIT_ACTION_META = {
   'status-update': { icon: RefreshCw, bg: 'bg-cyan-dim', text: 'text-cyan' },
   'delete-report': { icon: Trash2, bg: 'bg-status-open-bg', text: 'text-status-open' },
   'create-department': { icon: FolderPlus, bg: 'bg-status-resolved-bg', text: 'text-status-resolved' },
+  'update-department': { icon: Pencil, bg: 'bg-status-progress-bg', text: 'text-status-progress' },
 };
 
 const STATUS_SELECT_STYLES = {
@@ -57,8 +61,27 @@ const STATUS_SELECT_STYLES = {
   reopened: 'bg-status-open-bg border-status-open/40 text-status-open',
 };
 
+const MIN_SLA_HOURS = 1;
+const MAX_SLA_HOURS = 720;
+
+const isActiveStatus = (status) =>
+  status === 'pending' || status === 'in-progress' || status === 'reopened';
+
+const sortReports = (list) => {
+  return [...list].sort((a, b) => {
+    const aActive = isActiveStatus(a.status);
+    const bActive = isActiveStatus(b.status);
+
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+
+    return (b.priorityScore ?? 0) - (a.priorityScore ?? 0);
+  });
+};
+
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [selectedReportId, setSelectedReportId] = useState(null);
 
   // Reports
   const [reports, setReports] = useState([]);
@@ -74,11 +97,14 @@ function AdminDashboard() {
   const [departments, setDepartments] = useState([]);
   const [deptLoading, setDeptLoading] = useState(true);
   const [deptError, setDeptError] = useState('');
+  const [editingDeptId, setEditingDeptId] = useState(null);
   const [deptName, setDeptName] = useState('');
   const [deptDescription, setDeptDescription] = useState('');
   const [deptCategories, setDeptCategories] = useState([]);
+  const [deptSla, setDeptSla] = useState('');
   const [deptSubmitting, setDeptSubmitting] = useState(false);
   const [deptFormError, setDeptFormError] = useState('');
+  const [deptSuccess, setDeptSuccess] = useState('');
 
   // Audit Log
   const [auditLogs, setAuditLogs] = useState([]);
@@ -92,24 +118,10 @@ function AdminDashboard() {
   const [chatError, setChatError] = useState('');
 
   useEffect(() => {
-  getAllReports()
-    .then((data) => {
-      const isActive = (r) => r.status === 'pending' || r.status === 'in-progress';
-
-      const sorted = [...data.reports].sort((a, b) => {
-        const aActive = isActive(a);
-        const bActive = isActive(b);
-
-        if (aActive && !bActive) return -1;
-        if (!aActive && bActive) return 1;
-
-        return (b.priorityScore ?? 0) - (a.priorityScore ?? 0);
-      });
-
-      setReports(sorted);
-    })
-    .catch((err) => setReportsError(err.message))
-    .finally(() => setReportsLoading(false));
+    getAllReports()
+      .then((data) => setReports(sortReports(data.reports)))
+      .catch((err) => setReportsError(err.message))
+      .finally(() => setReportsLoading(false));
 
     getAnalytics()
       .then((data) => setAnalytics(data))
@@ -127,18 +139,109 @@ function AdminDashboard() {
       .finally(() => setAuditLoading(false));
   }, []);
 
-  const handleStatusChange = async (reportId, newStatus) => {
-  try {
-    await updateReportStatus(reportId, newStatus);
-    setReports((prev) =>
-      prev.map((r) => (r._id === reportId ? { ...r, status: newStatus } : r))
-    );
+  useEffect(() => {
+    const socket = connectSocket();
 
-    const freshAnalytics = await getAnalytics();
-    setAnalytics(freshAnalytics);
-  } catch (err) {
-    setReportsError(err.message);
-  }
+    const handleNewReport = (report) => {
+      setReports((prev) => {
+        if (prev.some((r) => r._id === report._id)) return prev;
+        return sortReports([report, ...prev]);
+      });
+      getAnalytics()
+        .then((data) => setAnalytics(data))
+        .catch(() => {});
+    };
+
+    const handleReportUpdated = ({ _id, status, clusterId, priorityScore }) => {
+      setReports((prev) =>
+        sortReports(
+          prev.map((r) =>
+            r._id === _id
+              ? { ...r, status, clusterId, priorityScore: priorityScore ?? r.priorityScore }
+              : r
+          )
+        )
+      );
+      getAnalytics()
+        .then((data) => setAnalytics(data))
+        .catch(() => {});
+    };
+
+    const handleReportDeleted = ({ _id }) => {
+      setReports((prev) => prev.filter((r) => r._id !== _id));
+      getAnalytics()
+        .then((data) => setAnalytics(data))
+        .catch(() => {});
+    };
+
+    socket.on('report:new', handleNewReport);
+    socket.on('report:updated', handleReportUpdated);
+    socket.on('report:deleted', handleReportDeleted);
+
+    return () => {
+      socket.off('report:new', handleNewReport);
+      socket.off('report:updated', handleReportUpdated);
+      socket.off('report:deleted', handleReportDeleted);
+    };
+  }, []);
+
+  const handleStatusChange = async (reportId, newStatus) => {
+    try {
+      const data = await updateReportStatus(reportId, newStatus);
+
+      setReports((prev) =>
+        sortReports(
+          prev.map((r) =>
+            r._id === reportId
+              ? {
+                  ...r,
+                  status: newStatus,
+                  priorityScore: data?.report?.priorityScore ?? r.priorityScore,
+                }
+              : r
+          )
+        )
+      );
+
+      const freshAnalytics = await getAnalytics();
+      setAnalytics(freshAnalytics);
+    } catch (err) {
+      setReportsError(err.message);
+    }
+  };
+
+  const handleDeleteReport = async (reportId) => {
+    await deleteReport(reportId);
+
+    setReports((prev) => prev.filter((r) => r._id !== reportId));
+    setSelectedReportId(null);
+
+    getAnalytics()
+      .then((data) => setAnalytics(data))
+      .catch(() => {});
+
+    getAuditLogs()
+      .then((fresh) => setAuditLogs(fresh.logs))
+      .catch(() => {});
+  };
+
+  const resetDeptForm = () => {
+    setEditingDeptId(null);
+    setDeptName('');
+    setDeptDescription('');
+    setDeptCategories([]);
+    setDeptSla('');
+    setDeptFormError('');
+  };
+
+  const startEditDepartment = (dept) => {
+    setEditingDeptId(dept._id);
+    setDeptName(dept.name);
+    setDeptDescription(dept.description || '');
+    setDeptCategories(dept.categories || []);
+    setDeptSla(String(dept.slaHours ?? 72));
+    setDeptFormError('');
+    setDeptSuccess('');
   };
 
   const toggleDeptCategory = (category) => {
@@ -147,29 +250,73 @@ function AdminDashboard() {
     );
   };
 
-  const handleCreateDepartment = async (e) => {
+  const findCategoryOwner = (category) =>
+    departments.find((d) => d._id !== editingDeptId && (d.categories || []).includes(category));
+
+  const handleSubmitDepartment = async (e) => {
     e.preventDefault();
     setDeptFormError('');
+    setDeptSuccess('');
 
     if (!deptName.trim()) {
       setDeptFormError('Department name is required');
       return;
     }
 
+    const sla = deptSla.trim() === '' ? undefined : Number(deptSla);
+
+    if (sla !== undefined && (!Number.isInteger(sla) || sla < MIN_SLA_HOURS || sla > MAX_SLA_HOURS)) {
+      setDeptFormError(`SLA must be a whole number between ${MIN_SLA_HOURS} and ${MAX_SLA_HOURS} hours`);
+      return;
+    }
+
     setDeptSubmitting(true);
     try {
-      const data = await createDepartment(deptName, deptDescription, deptCategories);
-      setDepartments((prev) => [...prev, data.department].sort((a, b) => a.name.localeCompare(b.name)));
-      setDeptName('');
-      setDeptDescription('');
-      setDeptCategories([]);
+      const payload = {
+        name: deptName,
+        description: deptDescription,
+        categories: deptCategories,
+        slaHours: sla,
+      };
+
+      let data;
+
+      if (editingDeptId) {
+        data = await updateDepartment(editingDeptId, payload);
+        setDepartments((prev) =>
+          prev.map((d) => (d._id === editingDeptId ? data.department : d))
+            .sort((a, b) => a.name.localeCompare(b.name))
+        );
+        setDeptSuccess(
+          data.message === 'No changes'
+            ? 'No changes to save.'
+            : `Department updated.${data.backfilled > 0 ? ` ${data.backfilled} existing report(s) assigned.` : ''}`
+        );
+      } else {
+        data = await createDepartment(deptName, deptDescription, deptCategories, sla);
+        setDepartments((prev) => [...prev, data.department].sort((a, b) => a.name.localeCompare(b.name)));
+        setDeptSuccess(
+          `Department created.${data.backfilled > 0 ? ` ${data.backfilled} existing report(s) assigned.` : ''}`
+        );
+      }
+
+      resetDeptForm();
+
+      if (data.backfilled > 0) {
+        getAllReports()
+          .then((fresh) => setReports(sortReports(fresh.reports)))
+          .catch(() => {});
+      }
+
+      getAuditLogs()
+        .then((fresh) => setAuditLogs(fresh.logs))
+        .catch(() => {});
     } catch (err) {
       setDeptFormError(err.message);
     } finally {
       setDeptSubmitting(false);
     }
   };
-
 
   const handleSendChat = async (e) => {
     e.preventDefault();
@@ -190,6 +337,8 @@ function AdminDashboard() {
       setChatLoading(false);
     }
   };
+
+  const selectedReport = reports.find((r) => r._id === selectedReportId) || null;
 
   const statusChartData = analytics?.statusCounts?.map((s) => ({
     name: STATUS_LABELS[s._id] || s._id,
@@ -361,7 +510,11 @@ function AdminDashboard() {
                       const thumbnail = report.photoUrls?.[0]?.url;
                       const reporterName = report.user?.name || 'Unknown';
                       return (
-                        <tr key={report._id} className="border-b border-hairline last:border-0 hover:bg-light/60 transition-colors">
+                        <tr
+                          key={report._id}
+                          onClick={() => setSelectedReportId(report._id)}
+                          className="border-b border-hairline last:border-0 hover:bg-light/60 transition-colors cursor-pointer"
+                        >
                           <td className="px-4 py-3">
                             {thumbnail ? (
                               <img src={thumbnail} alt={report.category} className="w-12 h-12 object-cover rounded-lg" />
@@ -369,7 +522,7 @@ function AdminDashboard() {
                               <div className="w-12 h-12 rounded-lg bg-light flex items-center justify-center">
                                 <ImageIcon size={16} className="text-ink/30" />
                               </div>
-                            )} 
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <Badge status="neutral">{CATEGORY_LABELS[report.category] || report.category}</Badge>
@@ -397,7 +550,7 @@ function AdminDashboard() {
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            {report.status === 'pending' || report.status === 'in-progress' ? (
+                            {isActiveStatus(report.status) ? (
                               <span className={`text-xs font-bold ${
                                 report.priorityScore >= 70 ? 'text-status-open' :
                                 report.priorityScore >= 40 ? 'text-status-progress' :
@@ -412,6 +565,7 @@ function AdminDashboard() {
                           <td className="px-4 py-3">
                             <select
                               value={report.status}
+                              onClick={(e) => e.stopPropagation()}
                               onChange={(e) => handleStatusChange(report._id, e.target.value)}
                               className={`border rounded-full px-3 py-1.5 text-xs font-semibold outline-none focus:ring-2 focus:ring-cyan/30 cursor-pointer transition-colors ${STATUS_SELECT_STYLES[report.status] || 'bg-light border-hairline text-ink'}`}
                             >
@@ -442,6 +596,12 @@ function AdminDashboard() {
                 </div>
               )}
 
+              {deptSuccess && (
+                <div className="flex items-center gap-2 bg-status-resolved-bg border border-status-resolved/30 text-status-resolved text-sm rounded-lg px-4 py-3 mb-6">
+                  <CheckCircle2 size={16} /> {deptSuccess}
+                </div>
+              )}
+
               {deptLoading ? (
                 <div className="flex items-center justify-center py-20">
                   <Loader2 size={28} className="text-cyan animate-spin" />
@@ -451,12 +611,24 @@ function AdminDashboard() {
               ) : (
                 <div className="grid sm:grid-cols-2 gap-5">
                   {departments.map((dept) => (
-                    <Card key={dept._id} padding="lg">
+                    <Card
+                      key={dept._id}
+                      padding="lg"
+                      className={editingDeptId === dept._id ? 'ring-2 ring-cyan' : ''}
+                    >
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-cyan-dim flex items-center justify-center text-cyan shrink-0">
                           <Building2 size={18} />
                         </div>
-                        <p className="font-heading text-base font-bold text-ink">{dept.name}</p>
+                        <p className="font-heading text-base font-bold text-ink flex-1">{dept.name}</p>
+                        <button
+                          type="button"
+                          onClick={() => startEditDepartment(dept)}
+                          aria-label={`Edit ${dept.name}`}
+                          className="w-8 h-8 rounded-lg border border-hairline text-ink/50 hover:border-cyan hover:text-cyan flex items-center justify-center transition-colors shrink-0"
+                        >
+                          <Pencil size={14} />
+                        </button>
                       </div>
 
                       {dept.description && (
@@ -464,17 +636,21 @@ function AdminDashboard() {
                       )}
 
                       <div className="flex flex-wrap gap-1.5 mt-4">
-                        {(dept.categories || []).map((cat) => (
-                          <Badge key={cat} status="neutral">{CATEGORY_LABELS[cat] || cat}</Badge>
-                        ))}
+                        {(dept.categories || []).length === 0 ? (
+                          <span className="font-body text-xs text-status-progress">No categories assigned</span>
+                        ) : (
+                          dept.categories.map((cat) => (
+                            <Badge key={cat} status="neutral">{CATEGORY_LABELS[cat] || cat}</Badge>
+                          ))
+                        )}
                       </div>
 
-                        <p className="font-body text-xs text-ink/50 mt-4">
-                          {reports.filter((r) => r.department === dept._id).length} report(s) assigned
-                        </p>
-                        <p className="font-body text-xs text-ink/40 mt-1 pt-3 border-t border-hairline">
-                          SLA: {dept.slaHours ?? 72}h
-                        </p>
+                      <p className="font-body text-xs text-ink/50 mt-4">
+                        {reports.filter((r) => r.department === dept._id).length} report(s) assigned
+                      </p>
+                      <p className="font-body text-xs text-ink/40 mt-1 pt-3 border-t border-hairline">
+                        SLA: {dept.slaHours ?? 72}h
+                      </p>
                     </Card>
                   ))}
                 </div>
@@ -483,10 +659,24 @@ function AdminDashboard() {
 
             <div>
               <form
-                onSubmit={handleCreateDepartment}
+                onSubmit={handleSubmitDepartment}
                 className="bg-white border border-hairline rounded-xl p-5"
               >
-                <p className="font-heading text-sm font-bold text-ink mb-4">New Department</p>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="font-heading text-sm font-bold text-ink">
+                    {editingDeptId ? 'Edit Department' : 'New Department'}
+                  </p>
+                  {editingDeptId && (
+                    <button
+                      type="button"
+                      onClick={resetDeptForm}
+                      aria-label="Cancel editing"
+                      className="text-ink/40 hover:text-status-open transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
 
                 {deptFormError && (
                   <div className="bg-status-open-bg border border-status-open/30 text-status-open text-xs rounded-lg px-3 py-2 mb-4">
@@ -514,36 +704,79 @@ function AdminDashboard() {
                 </div>
 
                 <div className="mt-4">
-                  <label className="text-sm font-medium text-ink block mb-2">Categories</label>
-                  <div className="flex flex-wrap gap-2">
-                    {ALL_CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => toggleDeptCategory(cat)}
-                        className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
-                          deptCategories.includes(cat)
-                            ? 'bg-cyan-dim border-cyan text-cyan'
-                            : 'border-hairline text-ink/60 hover:border-cyan hover:text-cyan'
-                        }`}
-                      >
-                        {CATEGORY_LABELS[cat]}
-                      </button>
-                    ))}
-                  </div>
+                  <label htmlFor="dept-sla" className="text-sm font-medium text-ink block mb-2">
+                    SLA (hours)
+                  </label>
+                  <input
+                    id="dept-sla"
+                    type="number"
+                    min={MIN_SLA_HOURS}
+                    max={MAX_SLA_HOURS}
+                    value={deptSla}
+                    onChange={(e) => setDeptSla(e.target.value)}
+                    placeholder="72"
+                    className="w-full border border-hairline rounded-lg px-4 py-3 font-body text-sm text-ink outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/20 transition-all"
+                  />
+                  <p className="font-body text-xs text-ink/40 mt-1">
+                    Time allowed to resolve a report ({MIN_SLA_HOURS}–{MAX_SLA_HOURS}h). Default 72.
+                  </p>
                 </div>
 
-                <div className="mt-5">
+                <div className="mt-4">
+                  <label className="text-sm font-medium text-ink block mb-2">Categories</label>
+                  <div className="flex flex-wrap gap-2">
+                    {ALL_CATEGORIES.map((cat) => {
+                      const owner = findCategoryOwner(cat);
+                      const selected = deptCategories.includes(cat);
+
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          disabled={!!owner}
+                          title={owner ? `Already belongs to ${owner.name}` : ''}
+                          onClick={() => toggleDeptCategory(cat)}
+                          className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+                            owner
+                              ? 'border-hairline text-ink/30 bg-light cursor-not-allowed'
+                              : selected
+                              ? 'bg-cyan-dim border-cyan text-cyan'
+                              : 'border-hairline text-ink/60 hover:border-cyan hover:text-cyan'
+                          }`}
+                        >
+                          {CATEGORY_LABELS[cat]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="font-body text-xs text-ink/40 mt-2">
+                    Greyed-out categories already belong to another department.
+                  </p>
+                </div>
+
+                <div className="mt-5 flex flex-col gap-2">
                   <Button
                     type="submit"
                     variant="primary"
                     size="md"
-                    icon={Plus}
+                    icon={editingDeptId ? Save : Plus}
                     loading={deptSubmitting}
                     className="w-full"
                   >
-                    Create Department
+                    {editingDeptId ? 'Update Department' : 'Create Department'}
                   </Button>
+
+                  {editingDeptId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="md"
+                      onClick={resetDeptForm}
+                      className="w-full"
+                    >
+                      Cancel
+                    </Button>
+                  )}
                 </div>
               </form>
             </div>
@@ -694,6 +927,20 @@ function AdminDashboard() {
         )}
 
       </div>
+
+      {/* ── Report details drawer ── */}
+      <AnimatePresence>
+        {selectedReport && (
+          <ReportDrawer
+            key={selectedReport._id}
+            report={selectedReport}
+            departments={departments}
+            onClose={() => setSelectedReportId(null)}
+            onStatusChange={handleStatusChange}
+            onDelete={handleDeleteReport}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -11,7 +11,7 @@ const auditLogSchema = new mongoose.Schema(
 
         action: {
             type: String,
-            enum: ['status-update', 'delete-report', 'create-department'],
+            enum: ['status-update', 'delete-report', 'create-department', 'update-department'],
             required: true,
         },
 

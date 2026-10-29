@@ -11,7 +11,7 @@ export const startSlaCron = () => {
         } catch (error) {
             console.error('Scheduled SLA check failed:', error.message);
         }
-    });
+    }, { timezone: 'Asia/Kolkata' });
 
     console.log('SLA breach cron job scheduled');
 };

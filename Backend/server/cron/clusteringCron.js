@@ -11,7 +11,7 @@ export const startClusteringCron = () => {
         } catch (error) {
             console.error('Scheduled clustering failed:', error.message);
         }
-    });
+    }, { timezone: 'Asia/Kolkata' });
 
     console.log('Clustering cron job scheduled');
 };

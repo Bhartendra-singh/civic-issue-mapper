@@ -7,14 +7,17 @@ const CATEGORY_WEIGHTS = {
     other: 0.4,
 };
 
+const REOPENED_BONUS = 15;
+
 export const calculatePriorityScore = (report) => {
     const categoryWeight = CATEGORY_WEIGHTS[report.category] ?? 0.4;
 
     const ageInDays = (Date.now() - report.createdAt.getTime()) / (1000 * 60 * 60 * 24);
 
     const categoryScore = categoryWeight * 40;
-    const upvoteScore = Math.min(report.upvoteCount, 10) * 3;
+    const upvoteScore = Math.min(report.upvoteCount ?? 0, 10) * 3;
     const ageScore = Math.min(ageInDays, 30) * 2;
+    const reopenedScore = report.status === 'reopened' ? REOPENED_BONUS : 0;
 
-    return Math.round(categoryScore + upvoteScore + ageScore);
+    return Math.round(categoryScore + upvoteScore + ageScore + reopenedScore);
 };
