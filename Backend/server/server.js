@@ -1,9 +1,9 @@
+import 'dotenv/config';
 import passport from './config/passport.js';
 import express from 'express';
 import helmet from 'helmet';
 import mongoose from 'mongoose';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/authRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
@@ -14,16 +14,13 @@ import departmentRoutes from './routes/departmentRoutes.js';
 import auditLogRoutes from './routes/auditLogRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import compression from 'compression';
-import './config/redis.js'; 
+import './config/redis.js';
 import { startClusteringCron } from './cron/clusteringCron.js';
 import { startSlaCron } from './cron/slaCron.js';
 import chatRoutes from './routes/chatRoutes.js';
 import http from 'http';
 import { initSocket } from './config/socket.js';
 import contactRoutes from './routes/contactRoutes.js';
-
-
-dotenv.config(); 
 
 
 function sanitizeObject(obj) {
@@ -38,19 +35,22 @@ function sanitizeObject(obj) {
   }
 }
 
-const app = express();  
+const app = express();
+
+// Render/Vercel jaise hosts reverse proxy ke peeche chalte hain.
+// "1" = ek proxy par bharosa karo, taaki asli client IP (rate limiter) aur https detection sahi ho.
+app.set('trust proxy', 1);
 
 
-//Middlewares 
+// Middlewares
 
-app.use(cors({ 
+app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
 }));
 
 app.use(helmet());
-app.use(compression()); 
-
+app.use(compression());
 
 app.use(express.json());
 
@@ -65,10 +65,15 @@ app.use(cookieParser());
 app.use(passport.initialize());
 
 
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('MongoDB connected successfully'))
-    .catch((err) => console.log('MongoDB connection error:', err));
+// Health check: uptime monitor yahan ping karega (Render ko jagaye rakhne ke liye)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 
+
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('MongoDB connected successfully'))
+  .catch((err) => console.log('MongoDB connection error:', err));
 
 
 startClusteringCron();
@@ -78,7 +83,7 @@ startSlaCron();
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/chat', chatRoutes);
-app.use('/api/notifications', notificationRoutes); 
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/upvotes', upvoteRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/departments', departmentRoutes);
@@ -88,12 +93,11 @@ app.use('/api/contact', contactRoutes);
 
 
 app.get('/', (req, res) => {
-    res.send('Server is running!');
+  res.send('Server is running!');
 });
 
 
-
-// Centralized error handler — catches anything that wasn't handled by a route's own try/catch
+// Centralized error handler: jo error kisi route ke try/catch me nahi pakda gaya wo yahan aata hai
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.stack);
 
@@ -106,14 +110,9 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-// app.listen(PORT, () => {
-//     console.log(`Server running on port ${PORT}`);
-// });
-
 const httpServer = http.createServer(app);
 initSocket(httpServer);
 
 httpServer.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
-

@@ -1,7 +1,6 @@
 import { io } from 'socket.io-client';
-import { tryRefreshToken } from './api';
+import { tryRefreshToken, SOCKET_URL } from './api';
 
-const SOCKET_URL = 'http://localhost:5000';
 const MAX_AUTH_RETRIES = 2;
 
 let socket = null;

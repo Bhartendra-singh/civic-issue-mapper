@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn, MapPin, ShieldCheck, Zap } from 'lucide-react';
-import { loginUser } from '../services/api';
+import { loginUser, API_URL } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 
-const API_URL = 'http://localhost:5000/api';
 
 function GoogleIcon({ size = 18 }) {
   return (

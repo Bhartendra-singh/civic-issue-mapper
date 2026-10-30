@@ -13,6 +13,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Input from '../components/ui/Input';
+import { API_URL } from '../services/api';
 
 
 const GITHUB_URL = 'https://github.com/Bhartendra-singh/civic-issue-mapper';
@@ -58,17 +59,17 @@ function Home() {
   };
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/reports/stats')
+    fetch(`${API_URL}/reports/stats`)
       .then((res) => res.json())
       .then((data) => setStats(data))
       .catch((err) => console.error('Failed to load stats', err));
 
-    fetch('http://localhost:5000/api/reports/public')
+    fetch(`${API_URL}/reports/public`)
       .then((res) => res.json())
       .then((data) => setAllReports(data.reports))
       .catch((err) => console.error('Failed to load reports', err));
 
-    fetch('http://localhost:5000/api/reports/accountability')
+    fetch(`${API_URL}/reports/accountability`)
       .then((res) => res.json())
       .then((data) => setAccountability(data))
       .catch((err) => console.error('Failed to load accountability metrics', err));

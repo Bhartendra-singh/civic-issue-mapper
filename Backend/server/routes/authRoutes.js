@@ -11,6 +11,9 @@ import redisClient from '../config/redis.js';
 const router = express.Router();
 
 
+const getClientUrl = () => process.env.CLIENT_URL || 'http://localhost:5173';
+
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5,
@@ -33,8 +36,17 @@ router.patch('/reset-password/:token', resetPassword);
 router.post('/logout', logout);
 router.post('/refresh', refreshAccessToken);
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
-router.get('/google/callback', passport.authenticate('google', { session: false, failureRedirect: 'http://localhost:5173/login' }), googleCallback);
+
+router.get(
+  '/google/callback',
+  (req, res, next) => {
+    passport.authenticate('google', {
+      session: false,
+      failureRedirect: `${getClientUrl()}/login`,
+    })(req, res, next);
+  },
+  googleCallback
+);
 
 
 export default router;
-

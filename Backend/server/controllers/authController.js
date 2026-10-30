@@ -8,13 +8,45 @@ import RefreshToken from '../models/RefreshToken.js';
 import { generateTokens } from '../utils/generateTokens.js';
 
 
+// ---------- Helpers (env-based URL + cookie settings) ----------
+
+const getClientUrl = () => process.env.CLIENT_URL || 'http://localhost:5173';
+
+const isProduction = () => process.env.NODE_ENV === 'production';
+
+const baseCookieOptions = () => ({
+    httpOnly: true,
+    secure: isProduction(),
+    sameSite: isProduction() ? 'none' : 'lax',
+});
+
+const setAuthCookies = (res, accessToken, refreshToken) => {
+    res.cookie('accessToken', accessToken, {
+        ...baseCookieOptions(),
+        maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie('refreshToken', refreshToken, {
+        ...baseCookieOptions(),
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+};
+
+const clearAuthCookies = (res) => {
+    res.clearCookie('accessToken', baseCookieOptions());
+    res.clearCookie('refreshToken', baseCookieOptions());
+};
+
+
+// ---------- Controllers ----------
+
 export const signup = async (req, res) => {
     try {
         const { name, email, password } = req.body;
 
         const existingUser = await User.findOne({ email });
-        
-        if(existingUser) {
+
+        if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
         }
 
@@ -23,7 +55,6 @@ export const signup = async (req, res) => {
 
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
-
         const newUser = await User.create({
             name,
             email,
@@ -31,22 +62,12 @@ export const signup = async (req, res) => {
             verificationToken,
         });
 
-        const verificationLink = `http://localhost:5173/verify-email/${verificationToken}`;
+        const verificationLink = `${getClientUrl()}/verify-email/${verificationToken}`;
         await sendVerificationEmail(newUser.email, verificationLink);
-
 
         const { accessToken, refreshToken } = await generateTokens(newUser._id, newUser.role);
 
-        res.cookie('accessToken', accessToken, {
-            httpOnly: true,
-            maxAge: 15 * 60 * 1000,
-        });
-
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
-
+        setAuthCookies(res, accessToken, refreshToken);
 
         res.status(201).json({
             message: 'User created. Please check your email to verify your account.',
@@ -59,46 +80,25 @@ export const signup = async (req, res) => {
 };
 
 
-
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
         const existingUser = await User.findOne({ email });
 
-        if(!existingUser) {
-            return res.status(400).json({ message: "Invalid email or password" });
+        if (!existingUser) {
+            return res.status(400).json({ message: 'Invalid email or password' });
         }
 
         const isPasswordCorrect = await bcrypt.compare(password, existingUser.password);
 
-        if(!isPasswordCorrect) {
+        if (!isPasswordCorrect) {
             return res.status(400).json({ message: 'Invalid email or password' });
         }
 
-        // const token = jwt.sign(
-        //     { id: existingUser._id, role: existingUser.role },
-        //     process.env.JWT_SECRET,
-        //     { expiresIn: '7d' }
-        // );
-
-        // res.cookie('token', token, {
-        //     httpOnly: true,
-        //     maxAge: 7 * 24 * 60 * 60 * 1000,
-        // });
-
         const { accessToken, refreshToken } = await generateTokens(existingUser._id, existingUser.role);
 
-        res.cookie('accessToken', accessToken, {
-            httpOnly: true,
-            maxAge: 15 * 60 * 1000,
-        });
-
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
-        
+        setAuthCookies(res, accessToken, refreshToken);
 
         res.status(200).json({
             message: 'Login successful',
@@ -121,11 +121,6 @@ export const getProfile = async (req, res) => {
 };
 
 
-// export const logout = (req, res) => {
-//     res.clearCookie('token');
-//     res.status(200).json({ message: 'Logged out successfully' });
-// };
-
 export const logout = async (req, res) => {
     try {
         const refreshToken = req.cookies.refreshToken;
@@ -134,8 +129,7 @@ export const logout = async (req, res) => {
             await RefreshToken.deleteOne({ token: refreshToken });
         }
 
-        res.clearCookie('accessToken');
-        res.clearCookie('refreshToken');
+        clearAuthCookies(res);
 
         res.status(200).json({ message: 'Logged out successfully' });
 
@@ -161,10 +155,9 @@ export const verifyEmail = async (req, res) => {
         await user.save();
 
         res.status(200).json({ message: 'Email verification successfully' });
-    
+
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
-
     }
 };
 
@@ -181,7 +174,7 @@ export const forgotPassword = async (req, res) => {
 
         const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
 
-        const resetLink = `http://localhost:5173/reset-password/${resetToken}`;
+        const resetLink = `${getClientUrl()}/reset-password/${resetToken}`;
         await sendPasswordResetEmail(user.email, resetLink);
 
         res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' });
@@ -242,7 +235,7 @@ export const updateProfile = async (req, res) => {
         await user.save();
 
         res.status(200).json({
-            message: 'Profile updated successfully' ,
+            message: 'Profile updated successfully',
             user: {
                 id: user._id,
                 name: user.name,
@@ -266,22 +259,13 @@ export const googleCallback = async (req, res) => {
 
         const { accessToken, refreshToken } = await generateTokens(user._id, user.role);
 
-        res.cookie('accessToken', accessToken, {
-            httpOnly: true,
-            maxAge: 15 * 60 * 1000,
-        });
+        setAuthCookies(res, accessToken, refreshToken);
 
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
-
-
-        res.redirect('http://localhost:5173');
+        res.redirect(getClientUrl());
 
     } catch (error) {
         console.log(error);
-        res.redirect('http://localhost:5173/login?error=google-auth-failed');
+        res.redirect(`${getClientUrl()}/login?error=google-auth-failed`);
     }
 };
 
@@ -315,15 +299,7 @@ export const refreshAccessToken = async (req, res) => {
 
         const { accessToken, refreshToken } = await generateTokens(user._id, user.role);
 
-        res.cookie('accessToken', accessToken, {
-            httpOnly: true,
-            maxAge: 15 * 60 * 1000,
-        });
-
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
+        setAuthCookies(res, accessToken, refreshToken);
 
         res.status(200).json({ message: 'Token refreshed successfully' });
 
