@@ -6,7 +6,11 @@ from category_classifier import predict_category
 
 app = FastAPI()
 
-@app.get("/")
+# @app.get("/")
+# def home():
+#     return {"message": "DBSCAN microservice is running"}
+
+@app.api_route("/", methods=["GET", "HEAD"])
 def home():
     return {"message": "DBSCAN microservice is running"}
 
