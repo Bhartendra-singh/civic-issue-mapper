@@ -4,11 +4,18 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 
-const transporter = nodemailer.createTransport({
+const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
+
+const SENDER_NAME = 'Civic Issue Mapper';
+
+const getSenderEmail = () => process.env.EMAIL_FROM || process.env.EMAIL_USER;
+
+
+// Local fallback: purana Gmail SMTP (sirf tab use hoga jab BREVO_API_KEY na ho)
+const smtpTransporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    requireTLS: true,
+    port: 465,
+    secure: true,
     family: 4,
     connectionTimeout: 15000,
     greetingTimeout: 15000,
@@ -19,9 +26,51 @@ const transporter = nodemailer.createTransport({
     },
 });
 
+
+const sendMail = async ({ to, subject, html, replyTo }) => {
+    if (process.env.BREVO_API_KEY) {
+        const payload = {
+            sender: { name: SENDER_NAME, email: getSenderEmail() },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+        };
+
+        if (replyTo) {
+            payload.replyTo = { email: replyTo };
+        }
+
+        const response = await fetch(BREVO_URL, {
+            method: 'POST',
+            headers: {
+                'api-key': process.env.BREVO_API_KEY,
+                'content-type': 'application/json',
+                accept: 'application/json',
+            },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(15000),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Brevo API ${response.status}: ${errorText}`);
+        }
+
+        return;
+    }
+
+    await smtpTransporter.sendMail({
+        from: `"${SENDER_NAME}" <${process.env.EMAIL_USER}>`,
+        to,
+        subject,
+        html,
+        ...(replyTo && { replyTo }),
+    });
+};
+
+
 export const sendVerificationEmail = async (toEmail, verificationLink) => {
-    await transporter.sendMail({
-        from: `"Civic Issue Mapper" <${process.env.EMAIL_USER}>`,
+    await sendMail({
         to: toEmail,
         subject: 'Verify your email address',
         html: `
@@ -34,8 +83,7 @@ export const sendVerificationEmail = async (toEmail, verificationLink) => {
 
 
 export const sendPasswordResetEmail = async (toEmail, resetLink) => {
-    await transporter.sendMail({
-        from: `"Civic Issue Mapper" <${process.env.EMAIL_USER}>`,
+    await sendMail({
         to: toEmail,
         subject: 'Reset your Password',
         html: `
@@ -57,9 +105,8 @@ const escapeHtml = (text) =>
 
 
 export const sendContactNotificationEmail = async ({ name, email, subject, message }) => {
-    await transporter.sendMail({
-        from: `"Civic Issue Mapper" <${process.env.EMAIL_USER}>`,
-        to: process.env.EMAIL_USER,
+    await sendMail({
+        to: getSenderEmail(),
         replyTo: email,
         subject: `[Contact] ${subject}`,
         html: `
