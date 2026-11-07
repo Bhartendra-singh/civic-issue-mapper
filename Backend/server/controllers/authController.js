@@ -63,7 +63,11 @@ export const signup = async (req, res) => {
         });
 
         const verificationLink = `${getClientUrl()}/verify-email/${verificationToken}`;
-        await sendVerificationEmail(newUser.email, verificationLink);
+        try {
+            await sendVerificationEmail(newUser.email, verificationLink);
+        } catch (emailError) {
+            console.error('Verification email failed:', emailError.message);
+        }
 
         const { accessToken, refreshToken } = await generateTokens(newUser._id, newUser.role);
 
