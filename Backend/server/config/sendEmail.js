@@ -5,7 +5,13 @@ dotenv.config();
 
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    family: 4,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -22,7 +28,6 @@ export const sendVerificationEmail = async (toEmail, verificationLink) => {
             <p>Please verify your email by clicking below:</p>
             <a href="${verificationLink}">Verify Email</a>
         `,
-
     });
 };
 
